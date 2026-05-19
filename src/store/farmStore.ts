@@ -1,0 +1,722 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { supabase } from '@/lib/supabase';
+
+export interface Preset {
+  id: string;
+  name: string;
+  targetGoal: number;
+  jobItemLimit: number;
+  selectedJobIds?: string[];
+  calcVehicleId?: string;
+  isCraftingRoute?: boolean;
+  routeCraftingName?: string;
+  routeCraftingRatio?: number;
+  routeCraftingPrice?: number;
+  isVipMode?: boolean;
+  isProcessBeforeStore?: boolean;
+  farmMode?: 'city' | 'dimension';
+  dimensionPocketLoops?: number;
+  dimensionYieldPerLoop?: number;
+}
+
+export interface AnimalYield {
+  name: string;
+  weight: number;
+  pricePerItem: number;
+  quantityPerRound: number;
+  chance?: number;
+}
+
+export interface Job {
+  id: string;
+  presetId?: string;
+  name: string;
+  pricePerItem: number;
+  itemWeight: number;
+  processingType: 'none' | 'one_to_one' | 'batch_to_one';
+  processRatio: number;
+  finalItemName: string;
+  jobCategory: 'white' | 'animal';
+  // Animal-specific fields
+  animalsPerRound?: number;
+  totalRounds?: number;
+  minutesPerRound?: number;
+  animalYields?: AnimalYield[];
+}
+
+export interface Vehicle {
+  id: string;
+  presetId?: string;
+  name: string;
+  trunkCapacity: number;
+}
+
+export interface JobCheckpoint {
+  jobId: string;
+  durationMs: number;
+  itemsGathered: number;
+}
+
+export interface Lap {
+  id?: string;
+  lapNumber: number;
+  durationMs: number;
+  itemsGathered: number;
+  ecoEarned: number;
+  checkpoints?: any[];
+}
+
+export interface FarmSession {
+  id: string;
+  presetId?: string;
+  jobId: string; // comma separated job ids
+  vehicleId: string;
+  startTime: number;
+  laps: Lap[];
+  isCrafting?: boolean;
+  craftingName?: string;
+  craftingRatio?: number;
+  craftingPrice?: number;
+  isVip?: boolean;
+  farmMode?: 'city' | 'dimension';
+  dimensionLoops?: number;
+  isPublic?: boolean;
+  jobCategory?: 'white' | 'animal';
+}
+
+interface FarmState {
+  userId: string | null;
+  setUserId: (id: string | null) => void;
+  
+  presets: Preset[];
+  activePresetId: string;
+  jobs: Job[];
+  vehicles: Vehicle[];
+  sessions: FarmSession[];
+  activeSession: FarmSession | null;
+  
+  addPreset: (name: string) => void;
+  updatePreset: (id: string, data: Partial<Preset>) => void;
+  removePreset: (id: string) => void;
+  setActivePreset: (id: string) => void;
+  
+  addJob: (job: Job) => void;
+  removeJob: (id: string) => void;
+  addVehicle: (vehicle: Vehicle) => void;
+  removeVehicle: (id: string) => void;
+  
+  startSession: (jobId: string, vehicleId: string, craftingOpts?: { isCrafting: boolean, name: string, ratio: number, price: number }, isVip?: boolean, farmMode?: 'city' | 'dimension', dimensionLoops?: number, jobCategory?: 'white' | 'animal') => void;
+  logAnimalSession: (jobId: string, vehicleId: string, ecoEarned: number, durationMs: number, isVip?: boolean, actualYields?: { name: string; quantity: number; pricePerItem: number }[]) => void;
+  stopSession: () => void;
+  addLap: (lap: Omit<Lap, 'lapNumber'>) => void;
+  clearHistory: () => void;
+  removeSession: (id: string) => void;
+  
+  // Cloud Sync Actions
+  isCloudSyncing: boolean;
+  loadFromCloud: () => Promise<void>;
+  migrateToCloud: () => Promise<void>;
+  toggleSessionPublic: (id: string, isPublic: boolean) => Promise<string>;
+}
+
+const isUUID = (id?: string) => {
+  if (!id) return false;
+  return id.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+};
+
+export const useFarmStore = create<FarmState>()(
+  persist(
+    (set, get) => ({
+      userId: null,
+      setUserId: (id) => set({ userId: id }),
+      isCloudSyncing: false,
+      
+      presets: [{ id: 'default', name: 'Default City', targetGoal: 1000000, jobItemLimit: 60 }],
+      activePresetId: 'default',
+      jobs: [],
+      vehicles: [],
+      sessions: [],
+      activeSession: null,
+
+      addPreset: async (name) => {
+        const newId = crypto.randomUUID();
+        const { userId } = get();
+        const newPreset: Preset = { id: newId, name, targetGoal: 1000000, jobItemLimit: 60 };
+        
+        // Optimistic UI
+        set((state) => ({
+          presets: [...state.presets, newPreset],
+          activePresetId: newId
+        }));
+
+        if (userId) {
+          try {
+            await supabase.from('farm_presets').insert({
+              id: newPreset.id,
+              user_id: userId,
+              name: newPreset.name,
+              target_goal: newPreset.targetGoal,
+              job_item_limit: newPreset.jobItemLimit,
+            });
+          } catch (e) {
+            console.error("Failed to insert preset", e);
+          }
+        }
+      },
+      
+      updatePreset: async (id, data) => {
+        const { userId } = get();
+        set((state) => ({
+          presets: state.presets.map(p => p.id === id ? { ...p, ...data } : p)
+        }));
+
+        if (userId) {
+          const mappedData: any = {};
+          if (data.name !== undefined) mappedData.name = data.name;
+          if (data.targetGoal !== undefined) mappedData.target_goal = data.targetGoal;
+          if (data.jobItemLimit !== undefined) mappedData.job_item_limit = data.jobItemLimit;
+          if (data.isVipMode !== undefined) mappedData.is_vip_mode = data.isVipMode;
+          if (data.isProcessBeforeStore !== undefined) mappedData.is_process_before_store = data.isProcessBeforeStore;
+          if (data.farmMode !== undefined) mappedData.farm_mode = data.farmMode;
+          if (data.dimensionPocketLoops !== undefined) mappedData.dimension_pocket_loops = data.dimensionPocketLoops;
+          if (data.dimensionYieldPerLoop !== undefined) mappedData.dimension_yield_per_loop = data.dimensionYieldPerLoop;
+          
+          if (Object.keys(mappedData).length > 0) {
+            await supabase.from('farm_presets').update(mappedData).eq('id', id).eq('user_id', userId);
+          }
+        }
+      },
+
+      removePreset: async (id) => {
+        if (id === 'default') return; // Prevent deleting default locally if not uuid
+        const { userId } = get();
+        
+        set((state) => {
+          const newPresets = state.presets.filter(p => p.id !== id);
+          return {
+            presets: newPresets,
+            activePresetId: state.activePresetId === id ? (newPresets[0]?.id || 'default') : state.activePresetId
+          };
+        });
+
+        if (userId) {
+          await supabase.from('farm_presets').delete().eq('id', id).eq('user_id', userId);
+        }
+      },
+
+      setActivePreset: (id) => set({ activePresetId: id }),
+
+      addJob: async (job) => {
+        const { userId, activePresetId } = get();
+        const jobWithPreset = { ...job, presetId: activePresetId, id: crypto.randomUUID() }; // Ensure UUID
+        
+        set((state) => ({ jobs: [...state.jobs, jobWithPreset] }));
+
+        if (userId && isUUID(jobWithPreset.presetId)) {
+          try {
+            await supabase.from('farm_jobs').insert({
+              id: jobWithPreset.id,
+              user_id: userId,
+              preset_id: jobWithPreset.presetId,
+              name: jobWithPreset.name,
+              price_per_item: jobWithPreset.pricePerItem,
+              item_weight: jobWithPreset.itemWeight,
+              processing_type: jobWithPreset.processingType,
+              process_ratio: jobWithPreset.processRatio,
+              final_item_name: jobWithPreset.finalItemName,
+              job_category: jobWithPreset.jobCategory || 'white',
+              animals_per_round: jobWithPreset.animalsPerRound,
+              total_rounds: jobWithPreset.totalRounds,
+              minutes_per_round: jobWithPreset.minutesPerRound,
+              animal_yields: jobWithPreset.animalYields || []
+            });
+          } catch (e) {
+             console.error("Failed to insert job", e);
+          }
+        }
+      },
+      
+      removeJob: async (id) => {
+        const { userId } = get();
+        set((state) => ({ jobs: state.jobs.filter((j) => j.id !== id) }));
+        if (userId) {
+          await supabase.from('farm_jobs').delete().eq('id', id).eq('user_id', userId);
+        }
+      },
+
+      addVehicle: async (vehicle) => {
+        const { userId, activePresetId } = get();
+        const vehicleWithPreset = { ...vehicle, presetId: activePresetId, id: crypto.randomUUID() };
+        
+        set((state) => ({ vehicles: [...state.vehicles, vehicleWithPreset] }));
+
+        if (userId && isUUID(vehicleWithPreset.presetId)) {
+          try {
+            await supabase.from('farm_vehicles').insert({
+              id: vehicleWithPreset.id,
+              user_id: userId,
+              preset_id: vehicleWithPreset.presetId,
+              name: vehicleWithPreset.name,
+              trunk_capacity: vehicleWithPreset.trunkCapacity
+            });
+          } catch (e) {
+            console.error("Failed to insert vehicle", e);
+          }
+        }
+      },
+      
+      removeVehicle: async (id) => {
+        const { userId } = get();
+        set((state) => ({ vehicles: state.vehicles.filter((v) => v.id !== id) }));
+        if (userId) {
+          await supabase.from('farm_vehicles').delete().eq('id', id).eq('user_id', userId);
+        }
+      },
+
+      startSession: (jobId, vehicleId, craftingOpts, isVip, farmMode, dimensionLoops, jobCategory) => set((state) => {
+        if (state.activeSession) return state;
+        return {
+          activeSession: {
+            id: crypto.randomUUID(),
+            presetId: state.activePresetId,
+            jobId,
+            vehicleId,
+            startTime: Date.now(),
+            laps: [],
+            isCrafting: craftingOpts?.isCrafting,
+            craftingName: craftingOpts?.name,
+            craftingRatio: craftingOpts?.ratio,
+            craftingPrice: craftingOpts?.price,
+            isVip,
+            farmMode,
+            dimensionLoops,
+            jobCategory: jobCategory || 'white'
+          }
+        };
+      }),
+
+      logAnimalSession: async (jobId, vehicleId, ecoEarned, durationMs, isVip, actualYields) => {
+        const { userId, activePresetId } = get();
+        const checkpointsData = actualYields || [];
+        const lapId = crypto.randomUUID();
+        const session: FarmSession = {
+          id: crypto.randomUUID(),
+          presetId: activePresetId,
+          jobId,
+          vehicleId,
+          startTime: Date.now(),
+          laps: [{
+            id: lapId,
+            lapNumber: 1,
+            durationMs,
+            itemsGathered: checkpointsData.reduce((acc, y) => acc + y.quantity, 0),
+            ecoEarned,
+            checkpoints: checkpointsData
+          }],
+          isVip,
+          farmMode: 'city',
+          jobCategory: 'animal'
+        };
+
+        set((state) => ({
+          sessions: [...state.sessions, session]
+        }));
+
+        if (userId && isUUID(activePresetId)) {
+          try {
+            await supabase.from('farm_sessions').insert({
+              id: session.id,
+              user_id: userId,
+              preset_id: activePresetId,
+              job_id: jobId,
+              vehicle_id: isUUID(vehicleId) ? vehicleId : null,
+              start_time: new Date(session.startTime).toISOString(),
+              is_vip: isVip,
+              farm_mode: 'city',
+              job_category: 'animal'
+            });
+            await supabase.from('farm_laps').insert({
+              id: lapId,
+              session_id: session.id,
+              lap_number: 1,
+              duration_ms: durationMs,
+              items_gathered: checkpointsData.reduce((acc, y) => acc + y.quantity, 0),
+              eco_earned: ecoEarned,
+              checkpoints: checkpointsData
+            });
+          } catch (e) {
+            console.error("Failed to insert animal session", e);
+          }
+        }
+      },
+
+      stopSession: async () => {
+        const { userId, activeSession } = get();
+        if (!activeSession) return;
+        
+        set((state) => ({
+          sessions: [...state.sessions, activeSession],
+          activeSession: null,
+        }));
+
+        if (userId && activeSession.laps.length > 0) {
+          if (isUUID(activeSession.presetId)) {
+            try {
+              // Insert Session directly if preset is already a UUID
+              await supabase.from('farm_sessions').insert({
+                id: activeSession.id,
+                user_id: userId,
+                preset_id: activeSession.presetId,
+                job_id: activeSession.jobId,
+                vehicle_id: isUUID(activeSession.vehicleId) ? activeSession.vehicleId : null,
+                start_time: new Date(activeSession.startTime).toISOString(),
+                is_crafting: activeSession.isCrafting,
+                crafting_name: activeSession.craftingName,
+                crafting_ratio: activeSession.craftingRatio,
+                crafting_price: activeSession.craftingPrice,
+                is_vip: activeSession.isVip,
+                farm_mode: activeSession.farmMode,
+                dimension_loops: activeSession.dimensionLoops,
+                job_category: activeSession.jobCategory || 'white'
+              });
+
+              // Insert Laps
+              const lapInserts = activeSession.laps.map(lap => ({
+                id: lap.id || crypto.randomUUID(),
+                session_id: activeSession.id,
+                lap_number: lap.lapNumber,
+                duration_ms: lap.durationMs,
+                items_gathered: lap.itemsGathered,
+                eco_earned: lap.ecoEarned,
+                checkpoints: lap.checkpoints || []
+              }));
+              
+              if (lapInserts.length > 0) {
+                await supabase.from('farm_laps').insert(lapInserts);
+              }
+            } catch (e) {
+              console.error("Failed to insert session", e);
+            }
+          } else {
+            // Preset is 'default' or non-UUID — migrate everything to cloud
+            try {
+              await get().migrateToCloud();
+            } catch (e) {
+              console.error("Failed to auto-migrate after session stop", e);
+            }
+          }
+        }
+      },
+
+      addLap: (lap) =>
+        set((state) => {
+          if (!state.activeSession) return state;
+          const newLap = {
+            ...lap,
+            id: lap.id || crypto.randomUUID(),
+            lapNumber: state.activeSession.laps.length + 1,
+          };
+          return {
+            activeSession: {
+              ...state.activeSession,
+              laps: [...state.activeSession.laps, newLap],
+            },
+          };
+        }),
+
+      clearHistory: async () => {
+        const { userId, activePresetId } = get();
+        
+        set((state) => ({ 
+          sessions: state.sessions.filter(s => (s.presetId || 'default') !== activePresetId) 
+        }));
+
+        if (userId) {
+           await supabase.from('farm_sessions').delete().eq('preset_id', activePresetId).eq('user_id', userId);
+        }
+      },
+
+      removeSession: async (id) => {
+        const { userId } = get();
+        set((state) => ({
+          sessions: state.sessions.filter(s => s.id !== id)
+        }));
+        if (userId) {
+          await supabase.from('farm_sessions').delete().eq('id', id).eq('user_id', userId);
+        }
+      },
+
+      toggleSessionPublic: async (id, isPublic) => {
+        const { userId, sessions } = get();
+        const session = sessions.find(s => s.id === id);
+        let targetId = id;
+        
+        // If it's an old ID, force a sync first which will update the ID
+        if (!isUUID(id) && session) {
+           await get().migrateToCloud();
+           // Find the updated session ID based on start time
+           const updatedSessions = get().sessions;
+           const newSession = updatedSessions.find(s => 
+             new Date(s.startTime).getTime() === new Date(session.startTime).getTime()
+           );
+           if (newSession) {
+             targetId = newSession.id;
+           }
+        }
+
+        set((state) => ({
+          sessions: state.sessions.map(s => s.id === targetId ? { ...s, isPublic } : s)
+        }));
+        
+        if (userId && isUUID(targetId)) {
+          await supabase.from('farm_sessions').update({ is_public: isPublic }).eq('id', targetId).eq('user_id', userId);
+        }
+        return isUUID(targetId) ? targetId : id;
+      },
+
+      loadFromCloud: async () => {
+        const { userId } = get();
+        if (!userId) return;
+        set({ isCloudSyncing: true });
+        
+        try {
+          const [presetsRes, jobsRes, vehiclesRes, sessionsRes] = await Promise.all([
+            supabase.from('farm_presets').select('*').eq('user_id', userId),
+            supabase.from('farm_jobs').select('*').eq('user_id', userId),
+            supabase.from('farm_vehicles').select('*').eq('user_id', userId),
+            supabase.from('farm_sessions').select(`*, farm_laps(*)`).eq('user_id', userId)
+          ]);
+
+          // Only apply cloud data if cloud actually has data
+          if (presetsRes.data && presetsRes.data.length > 0) {
+            const cloudPresets = presetsRes.data.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              targetGoal: p.target_goal,
+              jobItemLimit: p.job_item_limit,
+              isVipMode: p.is_vip_mode,
+              isProcessBeforeStore: p.is_process_before_store,
+              farmMode: p.farm_mode,
+              dimensionPocketLoops: p.dimension_pocket_loops,
+              dimensionYieldPerLoop: p.dimension_yield_per_loop
+            }));
+            
+            const cloudJobs = (jobsRes.data || []).map((j: any) => ({
+              id: j.id,
+              presetId: j.preset_id,
+              name: j.name,
+              pricePerItem: j.price_per_item,
+              itemWeight: j.item_weight,
+              processingType: j.processing_type,
+              processRatio: j.process_ratio,
+              finalItemName: j.final_item_name,
+              jobCategory: j.job_category || 'white',
+              animalsPerRound: j.animals_per_round,
+              totalRounds: j.total_rounds,
+              minutesPerRound: j.minutes_per_round,
+              animalYields: j.animal_yields || []
+            }));
+
+            const cloudVehicles = (vehiclesRes.data || []).map((v: any) => ({
+              id: v.id,
+              presetId: v.preset_id,
+              name: v.name,
+              trunkCapacity: v.trunk_capacity
+            }));
+
+            const cloudSessions = (sessionsRes.data || []).map((s: any) => ({
+              id: s.id,
+              presetId: s.preset_id,
+              jobId: s.job_id,
+              vehicleId: s.vehicle_id,
+              startTime: new Date(s.start_time).getTime(),
+              isCrafting: s.is_crafting,
+              craftingName: s.crafting_name,
+              craftingRatio: s.crafting_ratio,
+              craftingPrice: s.crafting_price,
+              isVip: s.is_vip,
+              farmMode: s.farm_mode,
+              dimensionLoops: s.dimension_loops,
+              isPublic: s.is_public,
+              jobCategory: s.job_category || 'white',
+              laps: (s.farm_laps || []).sort((a: any, b: any) => a.lap_number - b.lap_number).map((l: any) => ({
+                id: l.id,
+                lapNumber: l.lap_number,
+                durationMs: l.duration_ms,
+                itemsGathered: l.items_gathered,
+                ecoEarned: l.eco_earned,
+                checkpoints: l.checkpoints
+              }))
+            }));
+
+            // Merge: cloud data takes priority, but keep local-only items
+            const local = get();
+            const cloudPresetIds = new Set(cloudPresets.map(p => p.id));
+            const cloudJobIds = new Set(cloudJobs.map(j => j.id));
+            const cloudVehicleIds = new Set(cloudVehicles.map(v => v.id));
+            const cloudSessionIds = new Set(cloudSessions.map(s => s.id));
+
+            // Keep local items that are NOT in cloud (local-only, not yet synced)
+            const localOnlyPresets = local.presets.filter(p => !cloudPresetIds.has(p.id) && p.id !== 'default');
+            const localOnlyJobs = local.jobs.filter(j => !cloudJobIds.has(j.id));
+            const localOnlyVehicles = local.vehicles.filter(v => !cloudVehicleIds.has(v.id));
+            const localOnlySessions = local.sessions.filter(s => !cloudSessionIds.has(s.id));
+
+            const mergedPresets = [...cloudPresets, ...localOnlyPresets];
+            const currentActiveId = local.activePresetId;
+            const newActivePresetId = mergedPresets.some(p => p.id === currentActiveId)
+              ? currentActiveId
+              : (cloudPresets[0]?.id || 'default');
+
+            set({
+              presets: mergedPresets,
+              activePresetId: newActivePresetId,
+              jobs: [...cloudJobs, ...localOnlyJobs],
+              vehicles: [...cloudVehicles, ...localOnlyVehicles],
+              sessions: [...cloudSessions, ...localOnlySessions]
+            });
+          }
+          // If cloud is empty, keep local data as-is (no overwrite)
+        } catch (error) {
+          console.error("Failed to load from cloud:", error);
+        } finally {
+          set({ isCloudSyncing: false });
+        }
+      },
+
+      migrateToCloud: async () => {
+        const state = get();
+        const { userId, presets, jobs, vehicles, sessions } = state;
+        if (!userId) return;
+        
+        set({ isCloudSyncing: true });
+        
+        try {
+          const presetMap: Record<string, string> = {};
+          const jobMap: Record<string, string> = {};
+          const vehicleMap: Record<string, string> = {};
+
+          // 1. Migrate Presets
+          const presetInserts = presets.map(p => {
+            const newId = isUUID(p.id) ? p.id : crypto.randomUUID();
+            presetMap[p.id] = newId;
+            return {
+              id: newId,
+              user_id: userId,
+              name: p.name,
+              target_goal: p.targetGoal,
+              job_item_limit: p.jobItemLimit,
+            };
+          });
+
+          const defaultPresetIdMap = presetMap['default'] || presetInserts[0]?.id;
+
+          if (presetInserts.length > 0) {
+            await supabase.from('farm_presets').upsert(presetInserts, { onConflict: 'id' });
+          }
+
+          // 2. Migrate Jobs
+          const jobInserts = jobs.map(j => {
+            const newId = isUUID(j.id) ? j.id : crypto.randomUUID();
+            jobMap[j.id] = newId;
+            return {
+              id: newId,
+              user_id: userId,
+              preset_id: presetMap[j.presetId || ''] || defaultPresetIdMap,
+              name: j.name,
+              price_per_item: j.pricePerItem,
+              item_weight: j.itemWeight,
+              processing_type: j.processingType,
+              process_ratio: j.processRatio,
+              final_item_name: j.finalItemName,
+              job_category: j.jobCategory || 'white',
+              animals_per_round: j.animalsPerRound,
+              total_rounds: j.totalRounds,
+              minutes_per_round: j.minutesPerRound,
+              animal_yields: j.animalYields || []
+            };
+          });
+          if (jobInserts.length > 0) await supabase.from('farm_jobs').upsert(jobInserts, { onConflict: 'id' });
+
+          // 3. Migrate Vehicles
+          const vehicleInserts = vehicles.map(v => {
+            const newId = isUUID(v.id) ? v.id : crypto.randomUUID();
+            vehicleMap[v.id] = newId;
+            return {
+              id: newId,
+              user_id: userId,
+              preset_id: presetMap[v.presetId || ''] || defaultPresetIdMap,
+              name: v.name,
+              trunk_capacity: v.trunkCapacity
+            };
+          });
+          if (vehicleInserts.length > 0) await supabase.from('farm_vehicles').upsert(vehicleInserts, { onConflict: 'id' });
+
+          // 4. Migrate Sessions
+          for (const s of sessions) {
+            const sid = isUUID(s.id) ? s.id : crypto.randomUUID();
+            
+            // Map comma separated job IDs
+            const mappedJobIds = (s.jobId || '').split(',').map(oldJid => jobMap[oldJid] || oldJid).join(',');
+            const mappedVehicleId = vehicleMap[s.vehicleId] || s.vehicleId;
+
+            await supabase.from('farm_sessions').upsert({
+              id: sid,
+              user_id: userId,
+              preset_id: presetMap[s.presetId || ''] || defaultPresetIdMap,
+              job_id: mappedJobIds,
+              vehicle_id: isUUID(mappedVehicleId) ? mappedVehicleId : null,
+              start_time: new Date(s.startTime).toISOString(),
+              is_crafting: s.isCrafting,
+              crafting_name: s.craftingName,
+              crafting_ratio: s.craftingRatio,
+              crafting_price: s.craftingPrice,
+              is_vip: s.isVip,
+              farm_mode: s.farmMode,
+              dimension_loops: s.dimensionLoops,
+              is_public: s.isPublic || false,
+              job_category: s.jobCategory || 'white'
+            }, { onConflict: 'id' });
+
+            const lapInserts = s.laps.map(lap => ({
+              id: lap.id || crypto.randomUUID(),
+              session_id: sid,
+              lap_number: lap.lapNumber,
+              duration_ms: lap.durationMs,
+              items_gathered: lap.itemsGathered,
+              eco_earned: lap.ecoEarned,
+              checkpoints: lap.checkpoints || []
+            }));
+            if (lapInserts.length > 0) await supabase.from('farm_laps').upsert(lapInserts, { onConflict: 'id' });
+          }
+
+          // Reload from cloud to get proper UUIDs synced to local state
+          await state.loadFromCloud();
+
+        } catch (error) {
+          console.error("Migration failed:", error);
+        } finally {
+          set({ isCloudSyncing: false });
+        }
+      }
+    }),
+    {
+      name: 'fivem-farm-storage',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Keep local migration safety
+          if (!state.presets || state.presets.length === 0) {
+            state.presets = [{
+              id: 'default',
+              name: 'Default City',
+              targetGoal: 1000000,
+              jobItemLimit: 60
+            }];
+            state.activePresetId = 'default';
+          }
+        }
+      }
+    }
+  )
+);
