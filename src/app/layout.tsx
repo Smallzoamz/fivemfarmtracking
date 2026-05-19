@@ -10,6 +10,10 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "FiveM Farm Optimizer",
   description: "Advanced lap timer and economy calculator for FiveM farming",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  }
 };
 
 export default function RootLayout({
