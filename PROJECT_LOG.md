@@ -72,6 +72,7 @@
 | 2026-05-19 20:15 | src/store/farmStore.ts | Multiple | Sync | Fixed | Added lap `id` mapping and preserved UUIDs in `addLap`, `logAnimalSession`, `stopSession`, `loadFromCloud`, and `migrateToCloud` to prevent duplication of laps during cloud sync/migration. |
 | 2026-05-19 20:15 | src/components/Dashboard.tsx | 257-262 | Timer | Fixed | Unified `lapId` generation in `handleNextJob` to share the same UUID between state and temporary finished lap object. |
 | 2026-05-19 20:30 | src/app/shared/[id]/page.tsx, src/components/SharedSessionDetail.tsx, supabase/migrations/20260519140000_add_public_read_policies.sql | All | Feature | Added | Created detailed collapsible/expandable shared farm session detail component with loops, checkpoints, yields, and localization switcher; added public RLS policies for guest read access to configurations. |
+| 2026-05-19 21:25 | src/app/icon.svg, public/icon.svg, src/app/layout.tsx | All | Design | Modified | Replaced default Next.js favicon.ico with a custom high-resolution SVG stopwatch+leaf logo to match the theme, and updated layout metadata. |
 
 
 
