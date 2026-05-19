@@ -116,7 +116,6 @@ interface FarmState {
   // Cloud Sync Actions
   isCloudSyncing: boolean;
   loadFromCloud: () => Promise<void>;
-  migrateToCloud: () => Promise<void>;
   toggleSessionPublic: (id: string, isPublic: boolean) => Promise<string>;
 }
 
@@ -399,12 +398,7 @@ export const useFarmStore = create<FarmState>()(
               console.error("Failed to insert session", e);
             }
           } else {
-            // Preset is 'default' or non-UUID — migrate everything to cloud
-            try {
-              await get().migrateToCloud();
-            } catch (e) {
-              console.error("Failed to auto-migrate after session stop", e);
-            }
+            // Preset is 'default' or non-UUID — skip cloud migration since auto-migrate is disabled
           }
         }
       },
@@ -452,18 +446,8 @@ export const useFarmStore = create<FarmState>()(
         const session = sessions.find(s => s.id === id);
         let targetId = id;
         
-        // If it's an old ID, force a sync first which will update the ID
-        if (!isUUID(id) && session) {
-           await get().migrateToCloud();
-           // Find the updated session ID based on start time
-           const updatedSessions = get().sessions;
-           const newSession = updatedSessions.find(s => 
-             new Date(s.startTime).getTime() === new Date(session.startTime).getTime()
-           );
-           if (newSession) {
-             targetId = newSession.id;
-           }
-        }
+        // Old ID mapping relies on auto-migration which is now disabled. 
+        // We will just proceed with the current targetId.
 
         set((state) => ({
           sessions: state.sessions.map(s => s.id === targetId ? { ...s, isPublic } : s)
@@ -585,121 +569,6 @@ export const useFarmStore = create<FarmState>()(
         }
       },
 
-      migrateToCloud: async () => {
-        const state = get();
-        const { userId, presets, jobs, vehicles, sessions } = state;
-        if (!userId) return;
-        
-        set({ isCloudSyncing: true });
-        
-        try {
-          const presetMap: Record<string, string> = {};
-          const jobMap: Record<string, string> = {};
-          const vehicleMap: Record<string, string> = {};
-
-          // 1. Migrate Presets
-          const presetInserts = presets.map(p => {
-            const newId = isUUID(p.id) ? p.id : crypto.randomUUID();
-            presetMap[p.id] = newId;
-            return {
-              id: newId,
-              user_id: userId,
-              name: p.name,
-              target_goal: p.targetGoal,
-              job_item_limit: p.jobItemLimit,
-            };
-          });
-
-          const defaultPresetIdMap = presetMap['default'] || presetInserts[0]?.id;
-
-          if (presetInserts.length > 0) {
-            await supabase.from('farm_presets').upsert(presetInserts, { onConflict: 'id' });
-          }
-
-          // 2. Migrate Jobs
-          const jobInserts = jobs.map(j => {
-            const newId = isUUID(j.id) ? j.id : crypto.randomUUID();
-            jobMap[j.id] = newId;
-            return {
-              id: newId,
-              user_id: userId,
-              preset_id: presetMap[j.presetId || ''] || defaultPresetIdMap,
-              name: j.name,
-              price_per_item: j.pricePerItem,
-              item_weight: j.itemWeight,
-              processing_type: j.processingType,
-              process_ratio: j.processRatio,
-              final_item_name: j.finalItemName,
-              job_category: j.jobCategory || 'white',
-              animals_per_round: j.animalsPerRound,
-              total_rounds: j.totalRounds,
-              minutes_per_round: j.minutesPerRound,
-              animal_yields: j.animalYields || []
-            };
-          });
-          if (jobInserts.length > 0) await supabase.from('farm_jobs').upsert(jobInserts, { onConflict: 'id' });
-
-          // 3. Migrate Vehicles
-          const vehicleInserts = vehicles.map(v => {
-            const newId = isUUID(v.id) ? v.id : crypto.randomUUID();
-            vehicleMap[v.id] = newId;
-            return {
-              id: newId,
-              user_id: userId,
-              preset_id: presetMap[v.presetId || ''] || defaultPresetIdMap,
-              name: v.name,
-              trunk_capacity: v.trunkCapacity
-            };
-          });
-          if (vehicleInserts.length > 0) await supabase.from('farm_vehicles').upsert(vehicleInserts, { onConflict: 'id' });
-
-          // 4. Migrate Sessions
-          for (const s of sessions) {
-            const sid = isUUID(s.id) ? s.id : crypto.randomUUID();
-            
-            // Map comma separated job IDs
-            const mappedJobIds = (s.jobId || '').split(',').map(oldJid => jobMap[oldJid] || oldJid).join(',');
-            const mappedVehicleId = vehicleMap[s.vehicleId] || s.vehicleId;
-
-            await supabase.from('farm_sessions').upsert({
-              id: sid,
-              user_id: userId,
-              preset_id: presetMap[s.presetId || ''] || defaultPresetIdMap,
-              job_id: mappedJobIds,
-              vehicle_id: isUUID(mappedVehicleId) ? mappedVehicleId : null,
-              start_time: new Date(s.startTime).toISOString(),
-              is_crafting: s.isCrafting,
-              crafting_name: s.craftingName,
-              crafting_ratio: s.craftingRatio,
-              crafting_price: s.craftingPrice,
-              is_vip: s.isVip,
-              farm_mode: s.farmMode,
-              dimension_loops: s.dimensionLoops,
-              is_public: s.isPublic || false,
-              job_category: s.jobCategory || 'white'
-            }, { onConflict: 'id' });
-
-            const lapInserts = s.laps.map(lap => ({
-              id: lap.id || crypto.randomUUID(),
-              session_id: sid,
-              lap_number: lap.lapNumber,
-              duration_ms: lap.durationMs,
-              items_gathered: lap.itemsGathered,
-              eco_earned: lap.ecoEarned,
-              checkpoints: lap.checkpoints || []
-            }));
-            if (lapInserts.length > 0) await supabase.from('farm_laps').upsert(lapInserts, { onConflict: 'id' });
-          }
-
-          // Reload from cloud to get proper UUIDs synced to local state
-          await state.loadFromCloud();
-
-        } catch (error) {
-          console.error("Migration failed:", error);
-        } finally {
-          set({ isCloudSyncing: false });
-        }
-      }
     }),
     {
       name: 'fivem-farm-storage',

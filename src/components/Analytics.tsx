@@ -68,9 +68,6 @@ export function Analytics() {
     if (!session.isPublic) {
       const updatedId = await toggleSessionPublic(session.id, true);
       if (updatedId) targetId = updatedId;
-      // Ensure the session is actually in the cloud by triggering a sync
-      const { migrateToCloud } = useFarmStore.getState();
-      await migrateToCloud();
     }
     
     const url = `${window.location.origin}/shared/${targetId}`;

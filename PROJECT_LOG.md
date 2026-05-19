@@ -73,6 +73,6 @@
 | 2026-05-19 20:15 | src/components/Dashboard.tsx | 257-262 | Timer | Fixed | Unified `lapId` generation in `handleNextJob` to share the same UUID between state and temporary finished lap object. |
 | 2026-05-19 20:30 | src/app/shared/[id]/page.tsx, src/components/SharedSessionDetail.tsx, supabase/migrations/20260519140000_add_public_read_policies.sql | All | Feature | Added | Created detailed collapsible/expandable shared farm session detail component with loops, checkpoints, yields, and localization switcher; added public RLS policies for guest read access to configurations. |
 | 2026-05-19 21:25 | src/app/icon.svg, public/icon.svg, src/app/layout.tsx | All | Design | Modified | Replaced default Next.js favicon.ico with a custom high-resolution SVG stopwatch+leaf logo to match the theme, and updated layout metadata. |
-
+| 2026-05-19 21:30 | src/store/farmStore.ts, src/components/Analytics.tsx | 572-687, 72-73 | Sync | Removed | Completely removed `migrateToCloud` logic to prevent legacy local session data from duplicating laps on the cloud during user logins or session sharing. |
 
 
