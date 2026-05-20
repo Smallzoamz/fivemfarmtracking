@@ -547,7 +547,24 @@ export const useFarmStore = create<FarmState>()(
             const localOnlyVehicles = local.vehicles.filter(v => !cloudVehicleIds.has(v.id));
             const localOnlySessions = local.sessions.filter(s => !cloudSessionIds.has(s.id));
 
-            const mergedPresets = [...cloudPresets, ...localOnlyPresets];
+            // Map cloud presets but retain local-only planner selection states
+            const mergedCloudPresets = cloudPresets.map((cloudPreset: any) => {
+              const localPreset = local.presets.find(p => p.id === cloudPreset.id);
+              if (localPreset) {
+                return {
+                  ...cloudPreset,
+                  selectedJobIds: localPreset.selectedJobIds,
+                  calcVehicleId: localPreset.calcVehicleId,
+                  isCraftingRoute: localPreset.isCraftingRoute,
+                  routeCraftingName: localPreset.routeCraftingName,
+                  routeCraftingRatio: localPreset.routeCraftingRatio,
+                  routeCraftingPrice: localPreset.routeCraftingPrice,
+                };
+              }
+              return cloudPreset;
+            });
+
+            const mergedPresets = [...mergedCloudPresets, ...localOnlyPresets];
             const currentActiveId = local.activePresetId;
             const newActivePresetId = mergedPresets.some(p => p.id === currentActiveId)
               ? currentActiveId
