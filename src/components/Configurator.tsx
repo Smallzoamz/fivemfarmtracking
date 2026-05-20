@@ -100,7 +100,14 @@ export function Configurator() {
                 <Label className="text-xs text-primary font-bold uppercase tracking-wider">{t("dash.preset")}</Label>
                 <div className="flex items-center gap-2">
                   <Select value={activePresetId} onValueChange={(val) => setActivePreset(val || "default")}>
-                    <SelectTrigger className="w-[180px] h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[180px] h-9 text-sm">
+                      <SelectValue>
+                        {(val) => {
+                          const preset = presets.find(p => p.id === val);
+                          return preset ? preset.name : (val || "Select City...");
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       {presets.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
@@ -163,10 +170,19 @@ export function Configurator() {
                 <Input type="number" value={newJob.itemWeight || ""} onChange={(e) => setNewJob({...newJob, itemWeight: Number(e.target.value)})} className="h-9 text-sm" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">{t("conf.procType")}</Label>
-                <Select value={newJob.processingType} onValueChange={(v: any) => setNewJob({...newJob, processingType: v})}>
-                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                 <Label className="text-xs">{t("conf.procType")}</Label>
+                 <Select value={newJob.processingType} onValueChange={(v: any) => setNewJob({...newJob, processingType: v})}>
+                   <SelectTrigger className="h-9 text-sm">
+                     <SelectValue>
+                       {(val) => {
+                         if (val === 'none') return t("conf.typeRaw");
+                         if (val === 'one_to_one') return t("conf.typeOneToOne");
+                         if (val === 'batch_to_one') return t("conf.typeBatch");
+                         return val;
+                       }}
+                     </SelectValue>
+                   </SelectTrigger>
+                   <SelectContent>
                     <SelectItem value="none">{t("conf.typeRaw")}</SelectItem>
                     <SelectItem value="one_to_one">{t("conf.typeOneToOne")}</SelectItem>
                     <SelectItem value="batch_to_one">{t("conf.typeBatch")}</SelectItem>

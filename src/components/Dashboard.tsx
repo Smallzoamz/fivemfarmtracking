@@ -448,7 +448,14 @@ export function Dashboard() {
                 <Label className="text-xs text-primary font-bold uppercase tracking-wider">{t("dash.preset")}</Label>
                 <div className="flex items-center gap-2">
                   <Select value={activePresetId} onValueChange={(val) => { setActivePreset(val || "default"); }}>
-                    <SelectTrigger className="w-[180px] h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[180px] h-9 text-sm">
+                      <SelectValue>
+                        {(val) => {
+                          const preset = presets.find(p => p.id === val);
+                          return preset ? preset.name : (val || "Select City...");
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       {presets.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
@@ -600,7 +607,14 @@ export function Dashboard() {
           <div className="space-y-1.5">
             <Label className="text-xs uppercase tracking-wider">{t("dash.selectVehicle")}</Label>
             <Select value={calcVehicleId} onValueChange={(val) => updatePreset(activePresetId, { calcVehicleId: val || "" })}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("dash.selectVehicle")} /></SelectTrigger>
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder={t("dash.selectVehicle")}>
+                  {(val) => {
+                    const vehicle = vehicles.find(v => v.id === val);
+                    return vehicle ? `${vehicle.name} (${vehicle.trunkCapacity}kg)` : (val || t("dash.selectVehicle"));
+                  }}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 {vehicles.filter(v => v.presetId === activePresetId || (!v.presetId && activePresetId === 'default')).map(v => <SelectItem key={v.id} value={v.id}>{v.name} ({v.trunkCapacity}kg)</SelectItem>)}
               </SelectContent>
