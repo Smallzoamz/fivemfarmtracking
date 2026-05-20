@@ -166,5 +166,13 @@ export const th = {
   "dash.actualYieldsDesc": "กรุณาปรับจำนวนจริงของวัตถุดิบแต่ละชิ้นที่ได้รับก่อนกดยืนยัน",
   "dash.logAndSave": "บันทึกข้อมูล",
   "dash.cancel": "ยกเลิก",
-  "dash.actualQuantity": "จำนวนที่ได้จริง"
+  "dash.actualQuantity": "จำนวนที่ได้จริง",
+
+  // Shared Session - Goal Calculator
+  "shared.goalCalc": "คำนวณเป้าหมาย",
+  "shared.avgTimeLap": "เวลาเฉลี่ย / รอบ",
+  "shared.avgEcoLap": "รายได้เฉลี่ย / รอบ",
+  "shared.enterTarget": "กรอกจำนวนเงินเป้าหมาย (Eco)",
+  "shared.lapsNeeded": "จำนวนรอบที่ต้องวิ่ง",
+  "shared.estTotalTime": "เวลารวมที่ต้องใช้"
 };

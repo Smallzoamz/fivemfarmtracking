@@ -12,7 +12,9 @@ import {
   MapPin, 
   Globe,
   Truck,
-  Zap
+  Zap,
+  Calculator,
+  Target
 } from "lucide-react";
 
 interface JobCheckpoint {
@@ -78,6 +80,7 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
   const [selectedLapNumber, setSelectedLapNumber] = useState<number>(
     session.laps.length > 0 ? session.laps[0].lapNumber : 1
   );
+  const [targetGoal, setTargetGoal] = useState<number>(0);
 
   const lapsPerPage = 5;
   const totalPages = Math.ceil(session.laps.length / lapsPerPage);
@@ -103,6 +106,12 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
   const totalEco = session.laps.reduce((acc, lap) => acc + lap.ecoEarned, 0);
   const lapCount = session.laps.length;
 
+  const avgMsPerLap = lapCount > 0 ? totalMs / lapCount : 0;
+  const avgEcoPerLap = lapCount > 0 ? totalEco / lapCount : 0;
+
+  const goalLapsNeeded = avgEcoPerLap > 0 && targetGoal > 0 ? Math.ceil(targetGoal / avgEcoPerLap) : 0;
+  const goalEstTimeMs = goalLapsNeeded * avgMsPerLap;
+
   const date = new Date(session.startTime).toLocaleDateString() + " " + new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   // Compute fastest/slowest based on farm mode
@@ -116,13 +125,11 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
   let slowestMs = 0;
 
   if (session.jobCategory === 'animal') {
-    // For animals, compare individual laps if multiple
     session.laps.forEach(lap => {
       if (lap.durationMs < fastestMs) { fastestMs = lap.durationMs; fastestLabel = `${t("dash.lap")} ${lap.lapNumber}`; }
       if (lap.durationMs > slowestMs) { slowestMs = lap.durationMs; slowestLabel = `${t("dash.lap")} ${lap.lapNumber}`; }
     });
   } else if (isDimensionSession && jobCount > 0) {
-    // Dimension: compare loop totals
     session.laps.forEach(lap => {
       const cps = lap.checkpoints || [];
       for (let li = 0; li < cps.length; li += jobCount) {
@@ -134,7 +141,6 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
       }
     });
   } else {
-    // City: compare individual job checkpoints
     session.laps.forEach(lap => {
       (lap.checkpoints || []).forEach(cp => {
         const jName = jobs.find(j => j.id === cp.jobId)?.name || cp.jobId;
@@ -485,6 +491,61 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
               <p className="text-center text-muted-foreground py-6 text-sm italic">ไม่มีข้อมูลผลลัพธ์วัตถุดิบ</p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Goal Calculator */}
+      {lapCount > 0 && (
+        <div className="bg-card border border-border/50 rounded-xl p-4 md:p-6 shadow-lg space-y-5">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5 border-b border-border/20 pb-2">
+            <Calculator className="w-4 h-4 text-primary" />
+            {t("shared.goalCalc")}
+          </h3>
+
+          {/* Avg Stats */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-[oklch(0.72_0.16_240/0.05)] rounded-lg border border-[oklch(0.72_0.16_240/0.2)] text-center">
+              <p className="text-[10px] text-[oklch(0.72_0.16_240)] uppercase font-bold tracking-wider">{t("shared.avgTimeLap")}</p>
+              <p className="text-xl font-mono font-bold text-[oklch(0.72_0.16_240)] mt-1">{formatTime(avgMsPerLap)}</p>
+            </div>
+            <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center">
+              <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">{t("shared.avgEcoLap")}</p>
+              <p className="text-xl font-mono font-bold text-emerald-400 mt-1">${Math.round(avgEcoPerLap).toLocaleString()}</p>
+            </div>
+          </div>
+
+          {/* Target Input */}
+          <div className="space-y-2">
+            <label className="text-xs text-primary font-bold uppercase tracking-wider flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5" />
+              {t("shared.enterTarget")}
+            </label>
+            <input
+              type="number"
+              value={targetGoal || ""}
+              onChange={(e) => setTargetGoal(Math.max(0, Number(e.target.value)))}
+              placeholder="e.g. 1000000"
+              className="w-full h-11 px-4 rounded-lg bg-background border border-border/50 text-foreground font-mono text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all"
+            />
+          </div>
+
+          {/* Calculated Results */}
+          {goalLapsNeeded > 0 && (
+            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent pointer-events-none" />
+                <p className="text-[10px] text-primary uppercase font-bold tracking-wider relative">{t("shared.lapsNeeded")}</p>
+                <p className="text-3xl font-mono font-black text-primary mt-1 relative">{goalLapsNeeded.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 relative">{t("dash.cyclesLeft")}</p>
+              </div>
+              <div className="p-4 bg-[oklch(0.72_0.16_240/0.05)] rounded-lg border border-[oklch(0.72_0.16_240/0.2)] text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.72_0.16_240/0.08)] to-transparent pointer-events-none" />
+                <p className="text-[10px] text-[oklch(0.72_0.16_240)] uppercase font-bold tracking-wider relative">{t("shared.estTotalTime")}</p>
+                <p className="text-3xl font-mono font-black text-[oklch(0.72_0.16_240)] mt-1 relative">{formatHours(goalEstTimeMs)}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 relative">{formatTime(goalEstTimeMs)}</p>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

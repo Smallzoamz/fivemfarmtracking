@@ -166,5 +166,13 @@ export const en = {
   "dash.actualYieldsDesc": "Please adjust the actual quantities received for each item before saving.",
   "dash.logAndSave": "Log & Save",
   "dash.cancel": "Cancel",
-  "dash.actualQuantity": "Actual Qty"
+  "dash.actualQuantity": "Actual Qty",
+
+  // Shared Session - Goal Calculator
+  "shared.goalCalc": "Goal Calculator",
+  "shared.avgTimeLap": "Avg Time / Lap",
+  "shared.avgEcoLap": "Avg Eco / Lap",
+  "shared.enterTarget": "Enter your target amount (Eco)",
+  "shared.lapsNeeded": "Laps Needed",
+  "shared.estTotalTime": "Estimated Total Time"
 };
