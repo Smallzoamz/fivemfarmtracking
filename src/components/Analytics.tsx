@@ -5,7 +5,7 @@ import { useFarmStore } from "@/store/farmStore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
-import { BarChart3, ChevronDown, ChevronUp, Clock, DollarSign, Zap, Layers, Trash2, Share2, Check, PawPrint, Briefcase } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronUp, Clock, DollarSign, Layers, Trash2, Share2, Check, PawPrint, Briefcase } from "lucide-react";
 
 export function Analytics() {
   const { presets, activePresetId, sessions, jobs, vehicles, clearHistory, removeSession } = useFarmStore();
@@ -373,7 +373,7 @@ export function Analytics() {
                               </div>
                             ))
                           ) : (
-                            <p className="text-xs text-muted-foreground italic">ไม่มีข้อมูลผลลัพธ์วัตถุดิบ</p>
+                            <p className="text-xs text-muted-foreground italic">{t("ana.noYieldData")}</p>
                           )
                         ) : (
                           session.laps.map((lap, i) => {

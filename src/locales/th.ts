@@ -179,5 +179,12 @@ export const th = {
   "shared.avgEcoLap": "รายได้เฉลี่ย / รอบ",
   "shared.enterTarget": "กรอกจำนวนเงินเป้าหมาย (Eco)",
   "shared.lapsNeeded": "จำนวนรอบที่ต้องวิ่ง",
-  "shared.estTotalTime": "เวลารวมที่ต้องใช้"
+  "shared.estTotalTime": "เวลารวมที่ต้องใช้",
+
+  // Cleanup - Added missing keys
+  "dash.pocketAllocation": "การจัดสรรกระเป๋า",
+  "dash.combinedIncome": "รายได้รวม (งานขาว + เลี้ยงสัตว์)",
+  "dash.roundsToGoal": "รอบถึงเป้าหมาย",
+  "dash.incomeRange": "ช่วงรายได้",
+  "ana.noYieldData": "ไม่มีข้อมูลผลลัพธ์วัตถุดิบ"
 };

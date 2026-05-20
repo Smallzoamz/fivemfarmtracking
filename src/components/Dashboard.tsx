@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Timer, Settings, PawPrint, Briefcase } from "lucide-react";
+import { Timer, Settings, PawPrint } from "lucide-react";
 
 export function Dashboard() {
   const { 
@@ -745,7 +745,7 @@ export function Dashboard() {
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dash.itemsTrunk")}</p>
               </div>
               <div className="p-3 bg-background/50 rounded-lg border border-border/40">
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Pocket Allocation</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{t("dash.pocketAllocation")}</p>
                 <p className="text-2xl font-mono font-bold text-amber-400 mt-1">{pocketSets} <span className="text-xs font-sans text-muted-foreground font-normal">{t("dash.sets")}</span></p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">{t("dash.itemsPocket")}</p>
               </div>
@@ -850,15 +850,15 @@ export function Dashboard() {
               {/* Combined eco summary */}
               {calcWhiteJobs.length > 0 && (
                 <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center">
-                  <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">รายได้รวม (งานขาว + เลี้ยงสัตว์)</p>
+                  <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">{t("dash.combinedIncome")}</p>
                   <p className="text-3xl font-mono font-black text-emerald-400 mt-1">${Math.round(combinedTotalEco).toLocaleString()}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     {animalMinLapsRequired === animalMaxLapsRequired 
-                      ? `${animalAvgLapsRequired} รอบถึงเป้าหมาย` 
-                      : `${animalMinLapsRequired} - ${animalMaxLapsRequired} รอบถึงเป้าหมาย (เฉลี่ย ${animalAvgLapsRequired} รอบ)}`}
+                      ? `${animalAvgLapsRequired} ${t("dash.roundsToGoal")}` 
+                      : `${animalMinLapsRequired} - ${animalMaxLapsRequired} ${t("dash.roundsToGoal")} (${t("dash.approx")} ${animalAvgLapsRequired})`}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
-                    ช่วงรายได้: ${Math.round(combinedMinEco).toLocaleString()} - ${Math.round(combinedMaxEco).toLocaleString()}
+                    {t("dash.incomeRange")}: ${Math.round(combinedMinEco).toLocaleString()} - ${Math.round(combinedMaxEco).toLocaleString()}
                   </p>
                 </div>
               )}

@@ -179,5 +179,12 @@ export const en = {
   "shared.avgEcoLap": "Avg Eco / Lap",
   "shared.enterTarget": "Enter your target amount (Eco)",
   "shared.lapsNeeded": "Laps Needed",
-  "shared.estTotalTime": "Estimated Total Time"
+  "shared.estTotalTime": "Estimated Total Time",
+
+  // Cleanup - Added missing keys
+  "dash.pocketAllocation": "Pocket Allocation",
+  "dash.combinedIncome": "Combined Income (White + Animal)",
+  "dash.roundsToGoal": "rounds to goal",
+  "dash.incomeRange": "Income Range",
+  "ana.noYieldData": "No yield data available"
 };

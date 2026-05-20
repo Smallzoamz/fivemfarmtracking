@@ -187,7 +187,11 @@ export const useFarmStore = create<FarmState>()(
           if (data.dimensionYieldPerLoop !== undefined) mappedData.dimension_yield_per_loop = data.dimensionYieldPerLoop;
           
           if (Object.keys(mappedData).length > 0) {
-            await supabase.from('farm_presets').update(mappedData).eq('id', id).eq('user_id', userId);
+            try {
+              await supabase.from('farm_presets').update(mappedData).eq('id', id).eq('user_id', userId);
+            } catch (e) {
+              console.error("Failed to update preset", e);
+            }
           }
         }
       },
@@ -205,7 +209,11 @@ export const useFarmStore = create<FarmState>()(
         });
 
         if (userId) {
-          await supabase.from('farm_presets').delete().eq('id', id).eq('user_id', userId);
+          try {
+            await supabase.from('farm_presets').delete().eq('id', id).eq('user_id', userId);
+          } catch (e) {
+            console.error("Failed to delete preset", e);
+          }
         }
       },
 
@@ -268,7 +276,11 @@ export const useFarmStore = create<FarmState>()(
         const { userId } = get();
         set((state) => ({ jobs: state.jobs.filter((j) => j.id !== id) }));
         if (userId) {
-          await supabase.from('farm_jobs').delete().eq('id', id).eq('user_id', userId);
+          try {
+            await supabase.from('farm_jobs').delete().eq('id', id).eq('user_id', userId);
+          } catch (e) {
+            console.error("Failed to delete job", e);
+          }
         }
       },
 
@@ -297,7 +309,11 @@ export const useFarmStore = create<FarmState>()(
         const { userId } = get();
         set((state) => ({ vehicles: state.vehicles.filter((v) => v.id !== id) }));
         if (userId) {
-          await supabase.from('farm_vehicles').delete().eq('id', id).eq('user_id', userId);
+          try {
+            await supabase.from('farm_vehicles').delete().eq('id', id).eq('user_id', userId);
+          } catch (e) {
+            console.error("Failed to delete vehicle", e);
+          }
         }
       },
 
@@ -432,8 +448,6 @@ export const useFarmStore = create<FarmState>()(
             } catch (e) {
               console.error("Failed to insert session", e);
             }
-          } else {
-            // Preset is 'default' or non-UUID — skip cloud migration since auto-migrate is disabled
           }
         }
       },
@@ -462,7 +476,11 @@ export const useFarmStore = create<FarmState>()(
         }));
 
         if (userId) {
-           await supabase.from('farm_sessions').delete().eq('preset_id', activePresetId).eq('user_id', userId);
+          try {
+            await supabase.from('farm_sessions').delete().eq('preset_id', activePresetId).eq('user_id', userId);
+          } catch (e) {
+            console.error("Failed to clear history", e);
+          }
         }
       },
 
@@ -472,26 +490,29 @@ export const useFarmStore = create<FarmState>()(
           sessions: state.sessions.filter(s => s.id !== id)
         }));
         if (userId) {
-          await supabase.from('farm_sessions').delete().eq('id', id).eq('user_id', userId);
+          try {
+            await supabase.from('farm_sessions').delete().eq('id', id).eq('user_id', userId);
+          } catch (e) {
+            console.error("Failed to delete session", e);
+          }
         }
       },
 
       toggleSessionPublic: async (id, isPublic) => {
-        const { userId, sessions } = get();
-        const session = sessions.find(s => s.id === id);
-        let targetId = id;
-        
-        // Old ID mapping relies on auto-migration which is now disabled. 
-        // We will just proceed with the current targetId.
+        const { userId } = get();
 
         set((state) => ({
-          sessions: state.sessions.map(s => s.id === targetId ? { ...s, isPublic } : s)
+          sessions: state.sessions.map(s => s.id === id ? { ...s, isPublic } : s)
         }));
         
-        if (userId && isUUID(targetId)) {
-          await supabase.from('farm_sessions').update({ is_public: isPublic }).eq('id', targetId).eq('user_id', userId);
+        if (userId && isUUID(id)) {
+          try {
+            await supabase.from('farm_sessions').update({ is_public: isPublic }).eq('id', id).eq('user_id', userId);
+          } catch (e) {
+            console.error("Failed to toggle session public", e);
+          }
         }
-        return isUUID(targetId) ? targetId : id;
+        return id;
       },
 
       loadFromCloud: async () => {
