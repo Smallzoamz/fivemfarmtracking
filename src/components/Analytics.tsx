@@ -154,10 +154,15 @@ export function Analytics() {
             
             const totalMs = session.laps.reduce((acc, lap) => acc + lap.durationMs, 0);
             const totalEco = session.laps.reduce((acc, lap) => acc + lap.ecoEarned, 0);
+            const totalMinEco = session.laps.reduce((acc, lap) => acc + (lap.minEcoEarned !== undefined ? lap.minEcoEarned : lap.ecoEarned), 0);
+            const totalMaxEco = session.laps.reduce((acc, lap) => acc + (lap.maxEcoEarned !== undefined ? lap.maxEcoEarned : lap.ecoEarned), 0);
             const lapCount = session.laps.length;
+            const hasPriceRange = session.laps.some(lap => lap.minEcoEarned !== undefined && lap.maxEcoEarned !== undefined && lap.minEcoEarned !== lap.maxEcoEarned);
             
             const avgMsPerLap = lapCount > 0 ? totalMs / lapCount : 0;
             const ecoPerLap = lapCount > 0 ? totalEco / lapCount : 0;
+            const minEcoPerLap = lapCount > 0 ? totalMinEco / lapCount : 0;
+            const maxEcoPerLap = lapCount > 0 ? totalMaxEco / lapCount : 0;
             
             const ecoPerMs = totalMs > 0 ? totalEco / totalMs : 0;
             let estTimeStr = "N/A";
@@ -263,7 +268,16 @@ export function Analytics() {
                     <div className="font-mono text-[oklch(0.72_0.16_240)] font-bold text-xs hidden md:block">{formatTime(avgMsPerLap)}</div>
 
                     {/* Eco */}
-                    <div className="font-bold text-emerald-400 text-xs hidden md:block">${Math.floor(ecoPerLap).toLocaleString()}</div>
+                    <div className="font-bold text-emerald-400 text-xs hidden md:block">
+                      {hasPriceRange ? (
+                        <span>
+                          ${Math.floor(minEcoPerLap).toLocaleString()} - ${Math.floor(maxEcoPerLap).toLocaleString()}{" "}
+                          <span className="text-[9px] font-normal text-muted-foreground">({t("dash.approx")} ${Math.floor(ecoPerLap).toLocaleString()})</span>
+                        </span>
+                      ) : (
+                        `$${Math.floor(ecoPerLap).toLocaleString()}`
+                      )}
+                    </div>
 
                     {/* Est Time */}
                     <div className="font-bold text-foreground text-xs hidden md:block">{estTimeStr}</div>
@@ -318,7 +332,14 @@ export function Analytics() {
                           <DollarSign className="w-3 h-3 text-emerald-400" />
                           <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">{t("ana.totalEarned")}</span>
                         </div>
-                        <p className="text-lg font-mono font-bold text-emerald-400">${totalEco.toLocaleString()}</p>
+                        {hasPriceRange ? (
+                          <div className="leading-tight mt-0.5">
+                            <p className="text-sm font-mono font-bold text-emerald-400">${totalMinEco.toLocaleString()} - ${totalMaxEco.toLocaleString()}</p>
+                            <p className="text-[8px] text-muted-foreground">({t("dash.approx")} ${totalEco.toLocaleString()})</p>
+                          </div>
+                        ) : (
+                          <p className="text-lg font-mono font-bold text-emerald-400">${totalEco.toLocaleString()}</p>
+                        )}
                       </div>
                       <div className="p-2.5 bg-emerald-500/5 rounded-lg border border-emerald-500/15 text-center">
                         <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">{t("ana.fastestLap")}</span>
@@ -377,7 +398,14 @@ export function Analytics() {
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <span className="font-mono text-xs font-bold">{formatTime(lap.durationMs)}</span>
-                                    <span className="text-emerald-400 font-mono text-xs font-bold">${lap.ecoEarned.toLocaleString()}</span>
+                                    {lap.minEcoEarned !== undefined && lap.maxEcoEarned !== undefined && lap.minEcoEarned !== lap.maxEcoEarned ? (
+                                      <span className="text-emerald-400 font-mono text-xs font-bold">
+                                        ${lap.minEcoEarned.toLocaleString()} - ${lap.maxEcoEarned.toLocaleString()}{" "}
+                                        <span className="text-[9px] font-normal text-muted-foreground">({t("dash.approxAverage")} ${lap.ecoEarned.toLocaleString()})</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-emerald-400 font-mono text-xs font-bold">${lap.ecoEarned.toLocaleString()}</span>
+                                    )}
                                   </div>
                                 </div>
 

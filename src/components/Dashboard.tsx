@@ -80,9 +80,15 @@ export function Dashboard() {
   let pocketSets = 0;
   let totalSets = 0;
   let totalEco = 0;
+  let minTotalEco = 0;
+  let maxTotalEco = 0;
   let targetLapsLeft = 0;
+  let targetMinLapsLeft = 0;
+  let targetMaxLapsLeft = 0;
   let totalProcessedItems = 0;
   let targetDimensionLoops = 0;
+
+  const hasAnyWhitePriceRange = calcJobs.some(j => j.hasPriceRange);
 
   if (calcJobs.length > 0 && (selectedVehicle || farmMode === 'dimension')) {
     const totalWeightPerSet = calcJobs.reduce((acc, j) => acc + j.itemWeight, 0);
@@ -94,12 +100,37 @@ export function Dashboard() {
       
       if (isCraftingRoute) {
         totalEco = totalProcessedItems * routeCraftingPrice;
+        minTotalEco = totalEco;
+        maxTotalEco = totalEco;
       } else {
         const batchJob = calcJobs.find(j => j.processingType === 'batch_to_one');
         if (batchJob) {
-          totalEco = totalProcessedItems * batchJob.pricePerItem;
+          let jobAvgPrice = batchJob.pricePerItem;
+          let jobMinPrice = batchJob.pricePerItem;
+          let jobMaxPrice = batchJob.pricePerItem;
+          if (batchJob.hasPriceRange) {
+            jobMinPrice = batchJob.minPricePerItem || 0;
+            jobMaxPrice = batchJob.maxPricePerItem || 0;
+            jobAvgPrice = (jobMinPrice + jobMaxPrice) / 2;
+          }
+          totalEco = totalProcessedItems * jobAvgPrice;
+          minTotalEco = totalProcessedItems * jobMinPrice;
+          maxTotalEco = totalProcessedItems * jobMaxPrice;
         } else {
-          totalEco = totalProcessedItems * (calcJobs[calcJobs.length - 1]?.pricePerItem || 0);
+          const lastJob = calcJobs[calcJobs.length - 1];
+          if (lastJob) {
+            let jobAvgPrice = lastJob.pricePerItem;
+            let jobMinPrice = lastJob.pricePerItem;
+            let jobMaxPrice = lastJob.pricePerItem;
+            if (lastJob.hasPriceRange) {
+              jobMinPrice = lastJob.minPricePerItem || 0;
+              jobMaxPrice = lastJob.maxPricePerItem || 0;
+              jobAvgPrice = (jobMinPrice + jobMaxPrice) / 2;
+            }
+            totalEco = totalProcessedItems * jobAvgPrice;
+            minTotalEco = totalProcessedItems * jobMinPrice;
+            maxTotalEco = totalProcessedItems * jobMaxPrice;
+          }
         }
       }
       totalSets = totalProcessedItems; // For display purposes
@@ -118,21 +149,38 @@ export function Dashboard() {
           totalProcessedItems = Math.floor(totalSets / ratio);
         }
         totalEco = totalProcessedItems * routeCraftingPrice;
+        minTotalEco = totalEco;
+        maxTotalEco = totalEco;
       } else {
         calcJobs.forEach(job => {
+          let jobAvgPrice = job.pricePerItem;
+          let jobMinPrice = job.pricePerItem;
+          let jobMaxPrice = job.pricePerItem;
+          if (job.hasPriceRange) {
+            jobMinPrice = job.minPricePerItem || 0;
+            jobMaxPrice = job.maxPricePerItem || 0;
+            jobAvgPrice = (jobMinPrice + jobMaxPrice) / 2;
+          }
+
           if (job.processingType === 'batch_to_one') {
             if (isProcessBeforeStore) {
               totalProcessedItems += totalSets;
-              totalEco += totalSets * job.pricePerItem;
+              totalEco += totalSets * jobAvgPrice;
+              minTotalEco += totalSets * jobMinPrice;
+              maxTotalEco += totalSets * jobMaxPrice;
             } else {
               const ratio = Math.max(1, job.processRatio || 1);
               const items = Math.floor(totalSets / ratio);
               totalProcessedItems += items;
-              totalEco += items * job.pricePerItem;
+              totalEco += items * jobAvgPrice;
+              minTotalEco += items * jobMinPrice;
+              maxTotalEco += items * jobMaxPrice;
             }
           } else {
             totalProcessedItems += totalSets;
-            totalEco += totalSets * job.pricePerItem;
+            totalEco += totalSets * jobAvgPrice;
+            minTotalEco += totalSets * jobMinPrice;
+            maxTotalEco += totalSets * jobMaxPrice;
           }
         });
       }
@@ -140,6 +188,14 @@ export function Dashboard() {
 
     if (totalEco > 0) {
       targetLapsLeft = Math.ceil((activePreset.targetGoal || 1000000) / totalEco);
+    }
+    if (maxTotalEco > 0) {
+      targetMinLapsLeft = Math.ceil((activePreset.targetGoal || 1000000) / maxTotalEco);
+    }
+    if (minTotalEco > 0) {
+      targetMaxLapsLeft = Math.ceil((activePreset.targetGoal || 1000000) / minTotalEco);
+    } else {
+      targetMaxLapsLeft = Infinity;
     }
   }
 
@@ -221,9 +277,11 @@ export function Dashboard() {
       const laps = activeSession.laps;
       const totalMs = laps.reduce((a, l) => a + l.durationMs, 0);
       const totalEarned = laps.reduce((a, l) => a + l.ecoEarned, 0);
+      const totalMinEarned = laps.reduce((a, l) => a + (l.minEcoEarned !== undefined ? l.minEcoEarned : l.ecoEarned), 0);
+      const totalMaxEarned = laps.reduce((a, l) => a + (l.maxEcoEarned !== undefined ? l.maxEcoEarned : l.ecoEarned), 0);
       const fastest = Math.min(...laps.map(l => l.durationMs));
       const slowest = Math.max(...laps.map(l => l.durationMs));
-      setSummaryData({ laps, totalMs, totalEarned, fastest, slowest, count: laps.length });
+      setSummaryData({ laps, totalMs, totalEarned, totalMinEarned, totalMaxEarned, fastest, slowest, count: laps.length });
       setShowSummary(true);
     }
     stopSession();
@@ -257,9 +315,26 @@ export function Dashboard() {
         const lapMs = newCps.reduce((a, c) => a + c.durationMs, 0);
         const lapNum = activeSession.laps.length + 1;
         const lapId = crypto.randomUUID();
-        addLap({ id: lapId, durationMs: lapMs, itemsGathered: totalSets, ecoEarned: totalEco, checkpoints: newCps });
+        addLap({ 
+          id: lapId, 
+          durationMs: lapMs, 
+          itemsGathered: totalSets, 
+          ecoEarned: totalEco, 
+          minEcoEarned: minTotalEco, 
+          maxEcoEarned: maxTotalEco, 
+          checkpoints: newCps 
+        });
 
-        const finishedLap = { id: lapId, lapNumber: lapNum, durationMs: lapMs, itemsGathered: totalSets, ecoEarned: totalEco, checkpoints: newCps };
+        const finishedLap = { 
+          id: lapId, 
+          lapNumber: lapNum, 
+          durationMs: lapMs, 
+          itemsGathered: totalSets, 
+          ecoEarned: totalEco, 
+          minEcoEarned: minTotalEco, 
+          maxEcoEarned: maxTotalEco, 
+          checkpoints: newCps 
+        };
         setLastLapResult(finishedLap);
         setCheckpoints([]);
         setCurrentJobIndex(0);
@@ -271,9 +346,20 @@ export function Dashboard() {
           const allLaps = [...activeSession.laps, finishedLap];
           const totalMs = allLaps.reduce((a, l) => a + l.durationMs, 0);
           const totalEarned = allLaps.reduce((a, l) => a + l.ecoEarned, 0);
+          const totalMinEarned = allLaps.reduce((a, l) => a + (l.minEcoEarned !== undefined ? l.minEcoEarned : l.ecoEarned), 0);
+          const totalMaxEarned = allLaps.reduce((a, l) => a + (l.maxEcoEarned !== undefined ? l.maxEcoEarned : l.ecoEarned), 0);
           const fastest = Math.min(...allLaps.map(l => l.durationMs));
           const slowest = Math.max(...allLaps.map(l => l.durationMs));
-          setSummaryData({ laps: allLaps, totalMs, totalEarned, fastest, slowest, count: allLaps.length });
+          setSummaryData({ 
+            laps: allLaps, 
+            totalMs, 
+            totalEarned, 
+            totalMinEarned, 
+            totalMaxEarned, 
+            fastest, 
+            slowest, 
+            count: allLaps.length 
+          });
           setShowSummary(true);
           stopSession();
           setIsRunning(false);
@@ -304,7 +390,14 @@ export function Dashboard() {
   const avgLapMs = activeSession && activeSession.laps.length > 0 
     ? activeSession.laps.reduce((acc, lap) => acc + lap.durationMs, 0) / activeSession.laps.length 
     : 0;
-  const estTimeMs = avgLapMs * Math.max(0, targetLapsLeft - (activeSession?.laps.length || 0));
+  
+  const lapsLeftAvg = Math.max(0, targetLapsLeft - (activeSession?.laps.length || 0));
+  const lapsLeftMin = Math.max(0, targetMinLapsLeft - (activeSession?.laps.length || 0));
+  const lapsLeftMax = Math.max(0, targetMaxLapsLeft - (activeSession?.laps.length || 0));
+
+  const estTimeMs = avgLapMs * lapsLeftAvg;
+  const minEstTimeMs = avgLapMs * lapsLeftMin;
+  const maxEstTimeMs = avgLapMs * lapsLeftMax;
 
   const toggleJobSelection = (id: string) => {
     const newIds = selectedJobIds.includes(id) ? selectedJobIds.filter(x => x !== id) : [...selectedJobIds, id];
@@ -362,10 +455,26 @@ export function Dashboard() {
               {estTimeMs > 0 && (
                 <div className="mt-6 p-3 bg-primary/5 border border-primary/15 rounded-lg relative z-10 text-center">
                   <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">{t("dash.estTime")}</p>
-                  <p className="text-2xl font-black text-foreground">
-                    {formatHours(estTimeMs)}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">({Math.max(0, targetLapsLeft - (activeSession?.laps.length || 0))} {t("dash.cyclesLeft")})</p>
+                  {hasAnyWhitePriceRange ? (
+                    <>
+                      <p className="text-xl font-black text-foreground">
+                        {t("dash.approx")} {formatHours(minEstTimeMs)} - {formatHours(maxEstTimeMs)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        ({t("dash.approxAverage")} {formatHours(estTimeMs)})
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        ({t("dash.approx")} {lapsLeftMin} - {lapsLeftMax} {t("dash.cyclesLeft")})
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-black text-foreground">
+                        {formatHours(estTimeMs)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">({lapsLeftAvg} {t("dash.cyclesLeft")})</p>
+                    </>
+                  )}
                 </div>
               )}
             </>
@@ -378,7 +487,17 @@ export function Dashboard() {
             <h4 className="text-xs font-bold text-emerald-400 mb-2">✅ {t("dash.lapComplete", lastLapResult.lapNumber)}</h4>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div><span className="text-muted-foreground">{t("dash.lapTime")}:</span> <span className="font-mono font-bold">{formatTime(lastLapResult.durationMs)}</span></div>
-              <div><span className="text-muted-foreground">{t("dash.earned")}:</span> <span className="font-mono font-bold text-emerald-400">${lastLapResult.ecoEarned.toLocaleString()}</span></div>
+              <div>
+                <span className="text-muted-foreground">{t("dash.earned")}:</span>{" "}
+                {lastLapResult.minEcoEarned !== undefined && lastLapResult.maxEcoEarned !== undefined && lastLapResult.minEcoEarned !== lastLapResult.maxEcoEarned ? (
+                  <span className="font-mono font-bold text-emerald-400">
+                    ${lastLapResult.minEcoEarned.toLocaleString()} - ${lastLapResult.maxEcoEarned.toLocaleString()}{" "}
+                    <span className="text-[9px] text-muted-foreground font-normal">({t("dash.approxAverage")} ${lastLapResult.ecoEarned.toLocaleString()})</span>
+                  </span>
+                ) : (
+                  <span className="font-mono font-bold text-emerald-400">${lastLapResult.ecoEarned.toLocaleString()}</span>
+                )}
+              </div>
             </div>
             {lastLapResult.checkpoints && lastLapResult.checkpoints.length > 1 && (
               <div className="mt-2 space-y-1">
@@ -410,7 +529,14 @@ export function Dashboard() {
                     </div>
                     <div className="text-right">
                       <span className="font-mono font-bold">{formatTime(lap.durationMs)}</span>
-                      <span className="text-emerald-400 ml-2">${lap.ecoEarned.toLocaleString()}</span>
+                      {lap.minEcoEarned !== undefined && lap.maxEcoEarned !== undefined && lap.minEcoEarned !== lap.maxEcoEarned ? (
+                        <span className="text-emerald-400 ml-2 font-bold font-mono">
+                          ${lap.minEcoEarned.toLocaleString()} - ${lap.maxEcoEarned.toLocaleString()}{" "}
+                          <span className="text-[9px] text-muted-foreground font-normal">({t("dash.approxAverage")} ${lap.ecoEarned.toLocaleString()})</span>
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400 ml-2 font-bold font-mono">${lap.ecoEarned.toLocaleString()}</span>
+                      )}
                     </div>
                   </div>
                   {lap.checkpoints && lap.checkpoints.length > 1 && (
@@ -652,12 +778,36 @@ export function Dashboard() {
                 </div>
                 <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20">
                   <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">{t("dash.ecoPerLap")}</p>
-                  <p className="text-xl font-mono font-bold text-emerald-400 mt-1">${totalEco.toLocaleString()}</p>
+                  {hasAnyWhitePriceRange ? (
+                    <>
+                      <p className="text-base font-mono font-bold text-emerald-400 mt-1">
+                        ${minTotalEco.toLocaleString()} - ${maxTotalEco.toLocaleString()}
+                      </p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">
+                        ({t("dash.approxAverage")} ${totalEco.toLocaleString()})
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xl font-mono font-bold text-emerald-400 mt-1">${totalEco.toLocaleString()}</p>
+                  )}
                 </div>
                 <div className="p-3 bg-[oklch(0.72_0.16_240/0.05)] rounded-lg border border-[oklch(0.72_0.16_240/0.2)]">
                   <p className="text-[10px] text-[oklch(0.72_0.16_240)] uppercase font-bold tracking-wider">{t("dash.lapsRequired")}</p>
-                  <p className="text-xl font-mono font-bold text-[oklch(0.72_0.16_240)] mt-1">{targetLapsLeft}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{t("dash.cyclesLeft")}</p>
+                  {hasAnyWhitePriceRange ? (
+                    <>
+                      <p className="text-base font-mono font-bold text-[oklch(0.72_0.16_240)] mt-1">
+                        {targetMinLapsLeft} - {targetMaxLapsLeft}
+                      </p>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">
+                        ({t("dash.approx")} {targetLapsLeft} {t("dash.cyclesLeft")})
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xl font-mono font-bold text-[oklch(0.72_0.16_240)] mt-1">{targetLapsLeft}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{t("dash.cyclesLeft")}</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -771,7 +921,18 @@ export function Dashboard() {
               </div>
               <div className="bg-emerald-500/5 rounded-lg p-3 text-center border border-emerald-500/15">
                 <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">{t("dash.totalEarned")}</p>
-                <p className="text-2xl font-mono font-black text-emerald-400 mt-1">${summaryData.totalEarned.toLocaleString()}</p>
+                {summaryData.totalMinEarned !== undefined && summaryData.totalMaxEarned !== undefined && summaryData.totalMinEarned !== summaryData.totalMaxEarned ? (
+                  <div className="mt-1">
+                    <p className="text-lg font-mono font-black text-emerald-400">
+                      ${summaryData.totalMinEarned.toLocaleString()} - ${summaryData.totalMaxEarned.toLocaleString()}
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">
+                      ({t("dash.approxAverage")} ${summaryData.totalEarned.toLocaleString()})
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-2xl font-mono font-black text-emerald-400 mt-1">${summaryData.totalEarned.toLocaleString()}</p>
+                )}
               </div>
               <div className="bg-[oklch(0.72_0.16_240/0.05)] rounded-lg p-3 text-center border border-[oklch(0.72_0.16_240/0.15)]">
                 <p className="text-[10px] text-[oklch(0.72_0.16_240)] uppercase font-bold tracking-wider">{t("dash.totalTime")}</p>
@@ -798,9 +959,16 @@ export function Dashboard() {
               {summaryData.laps.map((lap: any, i: number) => (
                 <div key={i} className="flex justify-between text-xs p-2 bg-background/50 rounded-lg border border-border/20">
                   <span className="text-primary font-semibold">{t("dash.lap")} {i + 1}</span>
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 items-center">
                     <span className="font-mono">{formatTime(lap.durationMs)}</span>
-                    <span className="text-emerald-400 font-mono">${lap.ecoEarned.toLocaleString()}</span>
+                    {lap.minEcoEarned !== undefined && lap.maxEcoEarned !== undefined && lap.minEcoEarned !== lap.maxEcoEarned ? (
+                      <span className="text-emerald-400 font-mono">
+                        ${lap.minEcoEarned.toLocaleString()} - ${lap.maxEcoEarned.toLocaleString()}{" "}
+                        <span className="text-[9px] text-muted-foreground font-normal">({t("dash.approxAverage")} ${lap.ecoEarned.toLocaleString()})</span>
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400 font-mono">${lap.ecoEarned.toLocaleString()}</span>
+                    )}
                   </div>
                 </div>
               ))}

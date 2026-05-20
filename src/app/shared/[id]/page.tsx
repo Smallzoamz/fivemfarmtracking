@@ -79,6 +79,8 @@ export default async function SharedSessionPage({ params }: { params: Promise<{ 
       durationMs: l.duration_ms,
       itemsGathered: l.items_gathered,
       ecoEarned: l.eco_earned,
+      minEcoEarned: l.min_eco_earned || undefined,
+      maxEcoEarned: l.max_eco_earned || undefined,
       checkpoints: l.checkpoints || []
     }))
   };
@@ -89,6 +91,9 @@ export default async function SharedSessionPage({ params }: { params: Promise<{ 
     presetId: j.preset_id,
     name: j.name,
     pricePerItem: j.price_per_item,
+    minPricePerItem: j.min_price_per_item || 0,
+    maxPricePerItem: j.max_price_per_item || 0,
+    hasPriceRange: j.has_price_range || false,
     itemWeight: j.item_weight,
     processingType: j.processing_type as 'none' | 'one_to_one' | 'batch_to_one',
     processRatio: j.process_ratio,

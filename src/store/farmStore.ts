@@ -33,6 +33,9 @@ export interface Job {
   presetId?: string;
   name: string;
   pricePerItem: number;
+  minPricePerItem?: number;
+  maxPricePerItem?: number;
+  hasPriceRange?: boolean;
   itemWeight: number;
   processingType: 'none' | 'one_to_one' | 'batch_to_one';
   processRatio: number;
@@ -64,6 +67,8 @@ export interface Lap {
   durationMs: number;
   itemsGathered: number;
   ecoEarned: number;
+  minEcoEarned?: number;
+  maxEcoEarned?: number;
   checkpoints?: any[];
 }
 
@@ -220,6 +225,9 @@ export const useFarmStore = create<FarmState>()(
               preset_id: jobWithPreset.presetId,
               name: jobWithPreset.name,
               price_per_item: jobWithPreset.pricePerItem,
+              min_price_per_item: jobWithPreset.minPricePerItem || 0,
+              max_price_per_item: jobWithPreset.maxPricePerItem || 0,
+              has_price_range: jobWithPreset.hasPriceRange || false,
               item_weight: jobWithPreset.itemWeight,
               processing_type: jobWithPreset.processingType,
               process_ratio: jobWithPreset.processRatio,
@@ -388,6 +396,8 @@ export const useFarmStore = create<FarmState>()(
                 duration_ms: lap.durationMs,
                 items_gathered: lap.itemsGathered,
                 eco_earned: lap.ecoEarned,
+                min_eco_earned: lap.minEcoEarned || null,
+                max_eco_earned: lap.maxEcoEarned || null,
                 checkpoints: lap.checkpoints || []
               }));
               
@@ -491,6 +501,9 @@ export const useFarmStore = create<FarmState>()(
               presetId: j.preset_id,
               name: j.name,
               pricePerItem: j.price_per_item,
+              minPricePerItem: j.min_price_per_item || 0,
+              maxPricePerItem: j.max_price_per_item || 0,
+              hasPriceRange: j.has_price_range || false,
               itemWeight: j.item_weight,
               processingType: j.processing_type,
               processRatio: j.process_ratio,
@@ -530,6 +543,8 @@ export const useFarmStore = create<FarmState>()(
                 durationMs: l.duration_ms,
                 itemsGathered: l.items_gathered,
                 ecoEarned: l.eco_earned,
+                minEcoEarned: l.min_eco_earned || undefined,
+                maxEcoEarned: l.max_eco_earned || undefined,
                 checkpoints: l.checkpoints
               }))
             }));

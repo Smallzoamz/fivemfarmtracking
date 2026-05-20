@@ -32,6 +32,8 @@ interface Lap {
   durationMs: number;
   itemsGathered: number;
   ecoEarned: number;
+  minEcoEarned?: number;
+  maxEcoEarned?: number;
   checkpoints?: JobCheckpoint[];
 }
 
@@ -104,13 +106,24 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
 
   const totalMs = session.laps.reduce((acc, lap) => acc + lap.durationMs, 0);
   const totalEco = session.laps.reduce((acc, lap) => acc + lap.ecoEarned, 0);
+  const totalMinEco = session.laps.reduce((acc, lap) => acc + (lap.minEcoEarned !== undefined ? lap.minEcoEarned : lap.ecoEarned), 0);
+  const totalMaxEco = session.laps.reduce((acc, lap) => acc + (lap.maxEcoEarned !== undefined ? lap.maxEcoEarned : lap.ecoEarned), 0);
   const lapCount = session.laps.length;
 
   const avgMsPerLap = lapCount > 0 ? totalMs / lapCount : 0;
   const avgEcoPerLap = lapCount > 0 ? totalEco / lapCount : 0;
+  const avgMinEcoPerLap = lapCount > 0 ? totalMinEco / lapCount : 0;
+  const avgMaxEcoPerLap = lapCount > 0 ? totalMaxEco / lapCount : 0;
+
+  const hasPriceRange = session.laps.some(lap => lap.minEcoEarned !== undefined && lap.maxEcoEarned !== undefined && lap.minEcoEarned !== lap.maxEcoEarned);
 
   const goalLapsNeeded = avgEcoPerLap > 0 && targetGoal > 0 ? Math.ceil(targetGoal / avgEcoPerLap) : 0;
+  const minLapsNeeded = avgMaxEcoPerLap > 0 && targetGoal > 0 ? Math.ceil(targetGoal / avgMaxEcoPerLap) : 0;
+  const maxLapsNeeded = avgMinEcoPerLap > 0 && targetGoal > 0 ? Math.ceil(targetGoal / avgMinEcoPerLap) : 0;
+  
   const goalEstTimeMs = goalLapsNeeded * avgMsPerLap;
+  const minGoalEstTimeMs = minLapsNeeded * avgMsPerLap;
+  const maxGoalEstTimeMs = maxLapsNeeded * avgMsPerLap;
 
   const date = new Date(session.startTime).toLocaleDateString() + " " + new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -217,7 +230,18 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
         <div className="p-4 bg-card border border-border/50 rounded-xl text-center shadow-lg hover:border-emerald-500/30 transition-colors">
           <div className="flex justify-center mb-2"><DollarSign className="w-6 h-6 text-emerald-400" /></div>
           <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{t("ana.totalEarned")}</p>
-          <p className="text-2xl font-mono font-bold text-emerald-400 mt-1">${totalEco.toLocaleString()}</p>
+          {hasPriceRange ? (
+            <div className="mt-1">
+              <p className="text-xl font-mono font-bold text-emerald-400">
+                ${totalMinEco.toLocaleString()} - ${totalMaxEco.toLocaleString()}
+              </p>
+              <p className="text-[9px] text-muted-foreground">
+                ({t("dash.approxAverage")} ${totalEco.toLocaleString()})
+              </p>
+            </div>
+          ) : (
+            <p className="text-2xl font-mono font-bold text-emerald-400 mt-1">${totalEco.toLocaleString()}</p>
+          )}
         </div>
       </div>
 
@@ -307,7 +331,14 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
                           <td className="py-3 px-3 font-mono">{formatTime(lap.durationMs)}</td>
                           <td className="py-3 px-3 text-muted-foreground">{lap.itemsGathered}</td>
                           <td className="py-3 px-3 text-right font-mono text-emerald-400 font-bold">
-                            ${lap.ecoEarned.toLocaleString()}
+                            {lap.minEcoEarned !== undefined && lap.maxEcoEarned !== undefined && lap.minEcoEarned !== lap.maxEcoEarned ? (
+                              <div className="flex flex-col items-end">
+                                <span>${lap.minEcoEarned.toLocaleString()} - ${lap.maxEcoEarned.toLocaleString()}</span>
+                                <span className="text-[8px] font-normal text-muted-foreground">({t("dash.approx")} ${lap.ecoEarned.toLocaleString()})</span>
+                              </div>
+                            ) : (
+                              `$${lap.ecoEarned.toLocaleString()}`
+                            )}
                           </td>
                         </tr>
                       );
@@ -367,7 +398,14 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
                   </div>
                   <div className="p-2 bg-background/50 rounded-lg border border-border/30">
                     <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">{t("ana.totalEarned")}</span>
-                    <p className="text-sm font-mono font-bold text-emerald-400 mt-0.5">${selectedLap.ecoEarned.toLocaleString()}</p>
+                    {selectedLap.minEcoEarned !== undefined && selectedLap.maxEcoEarned !== undefined && selectedLap.minEcoEarned !== selectedLap.maxEcoEarned ? (
+                      <div className="mt-0.5">
+                        <p className="text-sm font-mono font-bold text-emerald-400">${selectedLap.minEcoEarned.toLocaleString()} - ${selectedLap.maxEcoEarned.toLocaleString()}</p>
+                        <p className="text-[8px] text-muted-foreground">({t("dash.approx")} ${selectedLap.ecoEarned.toLocaleString()})</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-mono font-bold text-emerald-400 mt-0.5">${selectedLap.ecoEarned.toLocaleString()}</p>
+                    )}
                   </div>
                 </div>
 
@@ -510,7 +548,18 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
             </div>
             <div className="p-3 bg-emerald-500/5 rounded-lg border border-emerald-500/20 text-center">
               <p className="text-[10px] text-emerald-400 uppercase font-bold tracking-wider">{t("shared.avgEcoLap")}</p>
-              <p className="text-xl font-mono font-bold text-emerald-400 mt-1">${Math.round(avgEcoPerLap).toLocaleString()}</p>
+              {hasPriceRange ? (
+                <div className="mt-1">
+                  <p className="text-base font-mono font-bold text-emerald-400">
+                    ${Math.round(avgMinEcoPerLap).toLocaleString()} - ${Math.round(avgMaxEcoPerLap).toLocaleString()}
+                  </p>
+                  <p className="text-[8px] text-muted-foreground">
+                    ({t("dash.approxAverage")} ${Math.round(avgEcoPerLap).toLocaleString()})
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xl font-mono font-bold text-emerald-400 mt-1">${Math.round(avgEcoPerLap).toLocaleString()}</p>
+              )}
             </div>
           </div>
 
@@ -535,14 +584,40 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 text-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/8 to-transparent pointer-events-none" />
                 <p className="text-[10px] text-primary uppercase font-bold tracking-wider relative">{t("shared.lapsNeeded")}</p>
-                <p className="text-3xl font-mono font-black text-primary mt-1 relative">{goalLapsNeeded.toLocaleString()}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5 relative">{t("dash.cyclesLeft")}</p>
+                {hasPriceRange ? (
+                  <>
+                    <p className="text-2xl font-mono font-black text-primary mt-1 relative">
+                      {minLapsNeeded.toLocaleString()} - {maxLapsNeeded.toLocaleString()}
+                    </p>
+                    <p className="text-[8px] text-muted-foreground mt-0.5 relative">
+                      ({t("dash.approx")} {goalLapsNeeded.toLocaleString()} {t("dash.cyclesLeft")})
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-3xl font-mono font-black text-primary mt-1 relative">{goalLapsNeeded.toLocaleString()}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 relative">{t("dash.cyclesLeft")}</p>
+                  </>
+                )}
               </div>
               <div className="p-4 bg-[oklch(0.72_0.16_240/0.05)] rounded-lg border border-[oklch(0.72_0.16_240/0.2)] text-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-[oklch(0.72_0.16_240/0.08)] to-transparent pointer-events-none" />
                 <p className="text-[10px] text-[oklch(0.72_0.16_240)] uppercase font-bold tracking-wider relative">{t("shared.estTotalTime")}</p>
-                <p className="text-3xl font-mono font-black text-[oklch(0.72_0.16_240)] mt-1 relative">{formatHours(goalEstTimeMs)}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5 relative">{formatTime(goalEstTimeMs)}</p>
+                {hasPriceRange ? (
+                  <>
+                    <p className="text-2xl font-mono font-black text-[oklch(0.72_0.16_240)] mt-1 relative">
+                      {formatHours(minGoalEstTimeMs)} - {formatHours(maxGoalEstTimeMs)}
+                    </p>
+                    <p className="text-[8px] text-muted-foreground mt-0.5 relative">
+                      ({t("dash.approx")} {formatHours(goalEstTimeMs)})
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-3xl font-mono font-black text-[oklch(0.72_0.16_240)] mt-1 relative">{formatHours(goalEstTimeMs)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 relative">{formatTime(goalEstTimeMs)}</p>
+                  </>
+                )}
               </div>
             </div>
           )}

@@ -17,7 +17,17 @@ export function Configurator() {
   const { t } = useTranslation();
 
   const [jobCategory, setJobCategory] = useState<'white' | 'animal'>('white');
-  const [newJob, setNewJob] = useState({ name: "", pricePerItem: 0, itemWeight: 0, processingType: 'none' as 'none' | 'one_to_one' | 'batch_to_one', processRatio: 1, finalItemName: "" });
+  const [newJob, setNewJob] = useState({
+    name: "",
+    pricePerItem: 0,
+    minPricePerItem: 0,
+    maxPricePerItem: 0,
+    hasPriceRange: false,
+    itemWeight: 0,
+    processingType: 'none' as 'none' | 'one_to_one' | 'batch_to_one',
+    processRatio: 1,
+    finalItemName: ""
+  });
   const [animalFields, setAnimalFields] = useState({ animalsPerRound: 1, totalRounds: 1, minutesPerRound: 5 });
   const [animalYields, setAnimalYields] = useState<AnimalYield[]>([{ ...emptyYield }]);
   const [newVehicle, setNewVehicle] = useState({ name: "", trunkCapacity: 0 });
@@ -56,7 +66,17 @@ export function Configurator() {
         jobCategory: 'white'
       });
     }
-    setNewJob({ name: "", pricePerItem: 0, itemWeight: 0, processingType: 'none', processRatio: 1, finalItemName: "" });
+    setNewJob({
+      name: "",
+      pricePerItem: 0,
+      minPricePerItem: 0,
+      maxPricePerItem: 0,
+      hasPriceRange: false,
+      itemWeight: 0,
+      processingType: 'none',
+      processRatio: 1,
+      finalItemName: ""
+    });
   };
 
   const handleAddVehicle = () => {
@@ -189,10 +209,34 @@ export function Configurator() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("conf.pricePerItem")}</Label>
-                <Input type="number" value={newJob.pricePerItem || ""} onChange={(e) => setNewJob({...newJob, pricePerItem: Number(e.target.value)})} className="h-9 text-sm" />
+              <div className="flex items-center space-x-2 md:col-span-2 py-1">
+                <input
+                  type="checkbox"
+                  id="hasPriceRange"
+                  checked={newJob.hasPriceRange || false}
+                  onChange={(e) => setNewJob({...newJob, hasPriceRange: e.target.checked})}
+                  className="rounded border-input text-primary focus:ring-ring h-4 w-4 bg-background border border-border"
+                />
+                <Label htmlFor="hasPriceRange" className="text-xs cursor-pointer select-none font-medium">{t("conf.priceFluctuates")}</Label>
               </div>
+
+              {newJob.hasPriceRange ? (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("conf.minPrice")}</Label>
+                    <Input type="number" value={newJob.minPricePerItem || ""} onChange={(e) => setNewJob({...newJob, minPricePerItem: Number(e.target.value)})} className="h-9 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("conf.maxPrice")}</Label>
+                    <Input type="number" value={newJob.maxPricePerItem || ""} onChange={(e) => setNewJob({...newJob, maxPricePerItem: Number(e.target.value)})} className="h-9 text-sm" />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("conf.pricePerItem")}</Label>
+                  <Input type="number" value={newJob.pricePerItem || ""} onChange={(e) => setNewJob({...newJob, pricePerItem: Number(e.target.value)})} className="h-9 text-sm" />
+                </div>
+              )}
               {newJob.processingType === 'batch_to_one' && (
                 <div className="space-y-1 md:col-span-2">
                   <Label className="text-xs">{t("conf.processRatio")}</Label>
@@ -282,7 +326,12 @@ export function Configurator() {
                   <div key={job.id} className="flex justify-between items-center p-3 bg-background/50 border border-border/40 rounded-lg hover:border-primary/30 transition-all group">
                     <div>
                       <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">{job.name}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">${job.pricePerItem} • {job.itemWeight}kg</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {job.hasPriceRange 
+                          ? `$${job.minPricePerItem} - $${job.maxPricePerItem} (สวิง) • ` 
+                          : `$${job.pricePerItem} • `}
+                        {job.itemWeight}kg
+                      </p>
                     </div>
                     <Button variant="destructive" size="sm" onClick={() => removeJob(job.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-xs h-7">{t("conf.delete")}</Button>
                   </div>
