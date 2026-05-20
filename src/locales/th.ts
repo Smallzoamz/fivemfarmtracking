@@ -4,6 +4,8 @@ export const th = {
   "nav.dashboard": "แดชบอร์ด",
   "nav.configurator": "ตั้งค่าข้อมูล",
   "nav.analytics": "ประวัติการฟาร์ม",
+  "nav.syncing": "กำลังซิงค์...",
+  "nav.connected": "คลาวด์",
   
   // Dashboard
   "dash.activeTimer": "ระบบจับเวลา (รายจุด)",

@@ -4,7 +4,7 @@ import { Configurator } from "@/components/Configurator"
 import { Dashboard } from "@/components/Dashboard"
 import { Analytics } from "@/components/Analytics"
 import { useTranslation } from "@/hooks/useTranslation"
-import { Timer, LayoutDashboard, Settings, BarChart3, LogOut, User } from "lucide-react"
+import { Timer, LayoutDashboard, Settings, BarChart3, LogOut, User, Cloud } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { useFarmStore } from "@/store/farmStore"
@@ -18,6 +18,7 @@ export default function Home() {
   
   const setUserId = useFarmStore(state => state.setUserId)
   const loadFromCloud = useFarmStore(state => state.loadFromCloud)
+  const isCloudSyncing = useFarmStore(state => state.isCloudSyncing)
 
   useEffect(() => {
     let mounted = true;
@@ -34,11 +35,8 @@ export default function Home() {
           setDisplayName(data.session.user.user_metadata?.display_name || data.session.user.email?.split('@')[0] || "User")
           setUserId(data.session.user.id)
           
-          // Prevent hanging on slow connections with an 8-second timeout
-          await Promise.race([
-            loadFromCloud(),
-            new Promise(resolve => setTimeout(resolve, 8000))
-          ]);
+          // Trigger cloud fetch in the background without blocking the UI
+          loadFromCloud().catch(err => console.error("Cloud load background error:", err));
         }
       } catch (err) {
         console.error("Auth check error:", err);
@@ -60,11 +58,8 @@ export default function Home() {
         setDisplayName(session.user.user_metadata?.display_name || session.user.email?.split('@')[0] || "User")
         setUserId(session.user.id)
         
-        // Timeout for onAuthStateChange as well
-        await Promise.race([
-          loadFromCloud(),
-          new Promise(resolve => setTimeout(resolve, 8000))
-        ]);
+        // Trigger cloud fetch in the background on auth change
+        loadFromCloud().catch(err => console.error("Cloud load on auth change error:", err));
         setLoading(false)
       }
     })
@@ -143,6 +138,22 @@ export default function Home() {
 
       {/* Top Right Controls (Language & User) */}
       <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+        {/* Cloud Sync Status Indicator */}
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all duration-300 backdrop-blur-md text-xs font-bold bg-card/85 border-border text-muted-foreground`}
+          title={isCloudSyncing ? t("nav.syncing") : t("nav.connected")}
+        >
+          <div className="relative flex h-2 w-2">
+            {isCloudSyncing && (
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            )}
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${isCloudSyncing ? 'bg-emerald-500' : 'bg-primary/60'}`}></span>
+          </div>
+          <Cloud className="w-3.5 h-3.5" />
+          <span className="text-[10px] uppercase hidden sm:inline tracking-wide font-black">
+            {isCloudSyncing ? t("nav.syncing") : t("nav.connected")}
+          </span>
+        </div>
+
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-card/80 backdrop-blur-md border border-border">
           <User className="w-3.5 h-3.5 text-primary" />
           <span className="text-xs font-bold text-foreground truncate max-w-[100px]">{displayName}</span>

@@ -4,6 +4,8 @@ export const en = {
   "nav.dashboard": "Dashboard",
   "nav.configurator": "Configurator",
   "nav.analytics": "Analytics",
+  "nav.syncing": "Syncing...",
+  "nav.connected": "Cloud",
   
   // Dashboard
   "dash.activeTimer": "Active Timer (Checkpoints)",
