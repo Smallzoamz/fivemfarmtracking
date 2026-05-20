@@ -121,12 +121,7 @@ export function Configurator() {
                 <div className="flex items-center gap-2">
                   <Select value={activePresetId} onValueChange={(val) => setActivePreset(val || "default")}>
                     <SelectTrigger className="w-[180px] h-9 text-sm">
-                      <SelectValue>
-                        {(val) => {
-                          const preset = presets.find(p => p.id === val);
-                          return preset ? preset.name : (val || "Select City...");
-                        }}
-                      </SelectValue>
+                      <SelectValue placeholder="Select City..." />
                     </SelectTrigger>
                     <SelectContent>
                       {presets.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
@@ -193,14 +188,7 @@ export function Configurator() {
                  <Label className="text-xs">{t("conf.procType")}</Label>
                  <Select value={newJob.processingType} onValueChange={(v: any) => setNewJob({...newJob, processingType: v})}>
                    <SelectTrigger className="h-9 text-sm">
-                     <SelectValue>
-                       {(val) => {
-                         if (val === 'none') return t("conf.typeRaw");
-                         if (val === 'one_to_one') return t("conf.typeOneToOne");
-                         if (val === 'batch_to_one') return t("conf.typeBatch");
-                         return val;
-                       }}
-                     </SelectValue>
+                     <SelectValue placeholder={t("conf.procType")} />
                    </SelectTrigger>
                    <SelectContent>
                     <SelectItem value="none">{t("conf.typeRaw")}</SelectItem>

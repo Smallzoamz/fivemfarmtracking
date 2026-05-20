@@ -219,7 +219,7 @@ export const useFarmStore = create<FarmState>()(
 
         if (userId && isUUID(jobWithPreset.presetId)) {
           try {
-            await supabase.from('farm_jobs').insert({
+            const { error } = await supabase.from('farm_jobs').insert({
               id: jobWithPreset.id,
               user_id: userId,
               preset_id: jobWithPreset.presetId,
@@ -238,6 +238,26 @@ export const useFarmStore = create<FarmState>()(
               minutes_per_round: jobWithPreset.minutesPerRound,
               animal_yields: jobWithPreset.animalYields || []
             });
+
+            if (error && (error.code === '42703' || error.message?.includes('min_price_per_item'))) {
+              // Fallback: Retry insert without price range columns if they don't exist in remote DB
+              await supabase.from('farm_jobs').insert({
+                id: jobWithPreset.id,
+                user_id: userId,
+                preset_id: jobWithPreset.presetId,
+                name: jobWithPreset.name,
+                price_per_item: jobWithPreset.pricePerItem,
+                item_weight: jobWithPreset.itemWeight,
+                processing_type: jobWithPreset.processingType,
+                process_ratio: jobWithPreset.processRatio,
+                final_item_name: jobWithPreset.finalItemName,
+                job_category: jobWithPreset.jobCategory || 'white',
+                animals_per_round: jobWithPreset.animalsPerRound,
+                total_rounds: jobWithPreset.totalRounds,
+                minutes_per_round: jobWithPreset.minutesPerRound,
+                animal_yields: jobWithPreset.animalYields || []
+              });
+            }
           } catch (e) {
              console.error("Failed to insert job", e);
           }
@@ -402,7 +422,12 @@ export const useFarmStore = create<FarmState>()(
               }));
               
               if (lapInserts.length > 0) {
-                await supabase.from('farm_laps').insert(lapInserts);
+                const { error: lapErr } = await supabase.from('farm_laps').insert(lapInserts);
+                if (lapErr && (lapErr.code === '42703' || lapErr.message?.includes('min_eco_earned'))) {
+                  // Fallback: Retry insert without min_eco_earned and max_eco_earned columns if they don't exist in remote DB
+                  const fallbackInserts = lapInserts.map(({ min_eco_earned, max_eco_earned, ...rest }) => rest);
+                  await supabase.from('farm_laps').insert(fallbackInserts);
+                }
               }
             } catch (e) {
               console.error("Failed to insert session", e);

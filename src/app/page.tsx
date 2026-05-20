@@ -217,9 +217,15 @@ export default function Home() {
 
         {/* Content */}
         <div className="animate-in fade-in slide-in-from-bottom-3 duration-500 ease-out">
-          {activeTab === "dashboard" && <Dashboard />}
-          {activeTab === "configurator" && <Configurator />}
-          {activeTab === "analytics" && <Analytics />}
+          <div style={{ display: activeTab === "dashboard" ? "block" : "none" }}>
+            <Dashboard />
+          </div>
+          <div style={{ display: activeTab === "configurator" ? "block" : "none" }}>
+            <Configurator />
+          </div>
+          <div style={{ display: activeTab === "analytics" ? "block" : "none" }}>
+            <Analytics />
+          </div>
         </div>
       </div>
     </main>
