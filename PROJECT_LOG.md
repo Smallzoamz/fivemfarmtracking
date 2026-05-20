@@ -75,4 +75,4 @@
 | 2026-05-19 21:25 | src/app/icon.svg, public/icon.svg, src/app/layout.tsx | All | Design | Modified | Replaced default Next.js favicon.ico with a custom high-resolution SVG stopwatch+leaf logo to match the theme, and updated layout metadata. |
 | 2026-05-19 21:30 | src/store/farmStore.ts, src/components/Analytics.tsx | 572-687, 72-73 | Sync | Removed | Completely removed `migrateToCloud` logic to prevent legacy local session data from duplicating laps on the cloud during user logins or session sharing. |
 | 2026-05-20 14:00 | supabase/migrations/20260520140000_add_performance_indexes.sql, src/app/page.tsx, src/locales/* | All | Performance | Optimized | Added PostgreSQL indexes to all user_id/preset_id/session_id foreign keys, switched page load to a non-blocking background cloud sync, and introduced a pulsing Cloud Sync Status indicator. |
-
+| 2026-05-20 14:10 | src/components/SharedSessionDetail.tsx | 258-397 | UI/UX | Redesigned | Redesigned public shared session page using a master-detail layout (paginated table on left, active checkpoint breakdown on right) for white jobs/loops, keeping animal farming simple. |

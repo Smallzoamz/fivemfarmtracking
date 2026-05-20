@@ -74,6 +74,17 @@ interface SharedSessionDetailProps {
 
 export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: SharedSessionDetailProps) {
   const { t, language, setLanguage } = useTranslation();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedLapNumber, setSelectedLapNumber] = useState<number>(
+    session.laps.length > 0 ? session.laps[0].lapNumber : 1
+  );
+
+  const lapsPerPage = 5;
+  const totalPages = Math.ceil(session.laps.length / lapsPerPage);
+  const startIndex = (currentPage - 1) * lapsPerPage;
+  const paginatedLaps = session.laps.slice(startIndex, startIndex + lapsPerPage);
+
+  const selectedLap = session.laps.find(l => l.lapNumber === selectedLapNumber) || session.laps[0];
 
   const formatTime = (ms: number) => {
     const s = Math.floor(ms / 1000);
@@ -255,16 +266,208 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
         )}
       </div>
 
-      {/* Laps List */}
-      <div className="bg-card border border-border/50 rounded-xl p-4 md:p-6 shadow-lg">
-        <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-1.5 border-b border-border/20 pb-2">
-          <Layers className="w-4 h-4 text-primary" />
-          {session.jobCategory === 'animal' ? t("ana.yieldBreakdown") : t("ana.lapBreakdown")}
-        </h3>
-        
-        <div className="space-y-3">
-          {session.jobCategory === 'animal' ? (
-            session.laps[0]?.checkpoints && session.laps[0].checkpoints.length > 0 ? (
+      {/* Laps Section (Only for white jobs / dimension routes) */}
+      {session.jobCategory !== 'animal' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Panel: Laps Table (lg:col-span-7) */}
+          <div className="lg:col-span-7 bg-card border border-border/50 rounded-xl p-4 md:p-6 shadow-lg flex flex-col justify-between">
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-1.5 border-b border-border/20 pb-2">
+                <Layers className="w-4 h-4 text-primary" />
+                {t("ana.lapBreakdown")}
+              </h3>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-border/20 text-[10px] text-muted-foreground uppercase font-black tracking-wider">
+                      <th className="py-2.5 px-3">{t("dash.lap")}</th>
+                      <th className="py-2.5 px-3">{t("ana.totalTime")}</th>
+                      <th className="py-2.5 px-3">{t("dash.sets") || "Sets"}</th>
+                      <th className="py-2.5 px-3 text-right">{t("ana.totalEarned")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/10">
+                    {paginatedLaps.map((lap) => {
+                      const isSelected = selectedLapNumber === lap.lapNumber;
+                      return (
+                        <tr
+                          key={lap.id || lap.lapNumber}
+                          onClick={() => setSelectedLapNumber(lap.lapNumber)}
+                          className={`cursor-pointer transition-all duration-200 text-xs font-medium hover:bg-primary/5
+                            ${isSelected ? "bg-primary/10 text-primary border-l-2 border-primary" : "text-foreground"}`}
+                        >
+                          <td className="py-3 px-3 font-bold"># {lap.lapNumber}</td>
+                          <td className="py-3 px-3 font-mono">{formatTime(lap.durationMs)}</td>
+                          <td className="py-3 px-3 text-muted-foreground">{lap.itemsGathered}</td>
+                          <td className="py-3 px-3 text-right font-mono text-emerald-400 font-bold">
+                            ${lap.ecoEarned.toLocaleString()}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {session.laps.length === 0 && (
+                <p className="text-center text-muted-foreground py-6 text-sm italic">
+                  {t("ana.unknown")}
+                </p>
+              )}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-border/20 pt-4 mt-4">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="px-3 py-1 bg-background hover:bg-primary/10 text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent rounded border border-border/40 transition-colors text-xs font-bold"
+                >
+                  &larr; Prev
+                </button>
+                <span className="text-[10px] text-muted-foreground font-black uppercase tracking-wider">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="px-3 py-1 bg-background hover:bg-primary/10 text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent rounded border border-border/40 transition-colors text-xs font-bold"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Right Panel: Lap Details Inspector (lg:col-span-5) */}
+          <div className="lg:col-span-5 bg-card border border-border/50 rounded-xl p-4 md:p-6 shadow-lg">
+            {selectedLap ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-border/20 pb-2">
+                  <h4 className="text-sm font-black text-foreground uppercase tracking-wide">
+                    {t("dash.lap")} {selectedLap.lapNumber} Details
+                  </h4>
+                  <span className="bg-primary/15 text-primary text-[10px] px-2 py-0.5 rounded-full border border-primary/25 font-bold uppercase tracking-wider">
+                    {selectedLap.itemsGathered} Sets
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="p-2 bg-background/50 rounded-lg border border-border/30">
+                    <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">{t("ana.totalTime")}</span>
+                    <p className="text-sm font-mono font-bold text-foreground mt-0.5">{formatTime(selectedLap.durationMs)}</p>
+                  </div>
+                  <div className="p-2 bg-background/50 rounded-lg border border-border/30">
+                    <span className="text-muted-foreground text-[10px] uppercase font-bold tracking-wider">{t("ana.totalEarned")}</span>
+                    <p className="text-sm font-mono font-bold text-emerald-400 mt-0.5">${selectedLap.ecoEarned.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {/* Visual Checkpoints Breakdown */}
+                <div className="space-y-3 pt-2">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1">
+                    <Zap className="w-3.5 h-3.5 text-primary" /> Checkpoint Breakdown
+                  </span>
+                  
+                  {(() => {
+                    const selectedLapCps = selectedLap.checkpoints || [];
+                    const selectedLapLoops: JobCheckpoint[][] = [];
+                    if (isDimensionSession && jobCount > 0 && selectedLapCps.length > jobCount) {
+                      for (let li = 0; li < selectedLapCps.length; li += jobCount) {
+                        selectedLapLoops.push(selectedLapCps.slice(li, li + jobCount));
+                      }
+                    }
+
+                    if (isDimensionSession && selectedLapLoops.length > 0) {
+                      return (
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                          {selectedLapLoops.map((loopCps, loopIdx) => {
+                            const loopTotalMs = loopCps.reduce((a, c) => a + c.durationMs, 0);
+                            return (
+                              <div key={loopIdx} className="rounded-lg border border-primary/15 bg-primary/[0.02] overflow-hidden shadow-sm">
+                                <div className="flex items-center justify-between px-3 py-1.5 bg-primary/[0.04] border-b border-primary/10">
+                                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider">Loop {loopIdx + 1}</span>
+                                  <span className="text-[10px] font-mono font-bold text-muted-foreground">{formatTime(loopTotalMs)}</span>
+                                </div>
+                                <div className="p-2 space-y-1.5">
+                                  {loopCps.map((cp, ci) => {
+                                    const jName = jobs.find(j => j.id === cp.jobId)?.name || cp.jobId;
+                                    const pctOfLoop = loopTotalMs > 0 ? (cp.durationMs / loopTotalMs * 100) : 0;
+                                    return (
+                                      <div key={ci} className="flex flex-col gap-1 text-[11px]">
+                                        <div className="flex justify-between font-medium">
+                                          <span className="text-muted-foreground truncate max-w-[150px]">{jName}</span>
+                                          <span className="font-mono text-foreground">{formatTime(cp.durationMs)}</span>
+                                        </div>
+                                        <div className="w-full h-1 bg-border/20 rounded-full overflow-hidden">
+                                          <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, pctOfLoop)}%` }} />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    } else if (selectedLapCps.length > 1) {
+                      return (
+                        <div className="space-y-3 pl-2 border-l border-primary/20 max-h-[300px] overflow-y-auto pr-1">
+                          {selectedLapCps.map((cp, ci) => {
+                            const jName = jobs.find(j => j.id === cp.jobId)?.name || cp.jobId;
+                            const pctOfLap = selectedLap.durationMs > 0 ? (cp.durationMs / selectedLap.durationMs * 100) : 0;
+                            return (
+                              <div key={ci} className="flex flex-col gap-1 text-[11px]">
+                                <div className="flex justify-between font-medium">
+                                  <span className="text-muted-foreground truncate max-w-[150px]">{jName}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-mono text-foreground">{formatTime(cp.durationMs)}</span>
+                                    <span className="text-[10px] text-muted-foreground/60">({pctOfLap.toFixed(0)}%)</span>
+                                  </div>
+                                </div>
+                                <div className="w-full h-1.5 bg-border/20 rounded-full overflow-hidden">
+                                  <div className="h-full bg-primary rounded-full" style={{ width: `${Math.min(100, pctOfLap)}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    } else if (selectedLapCps.length === 1) {
+                      return (
+                        <div className="text-xs text-muted-foreground p-3 bg-background/50 rounded-lg border border-border/30">
+                          {jobs.find(j => j.id === selectedLapCps[0].jobId)?.name || selectedLapCps[0].jobId}: <span className="font-mono font-bold text-foreground">{formatTime(selectedLapCps[0].durationMs)}</span>
+                        </div>
+                      );
+                    } else {
+                      return <p className="text-xs text-muted-foreground italic">No checkpoints found</p>;
+                    }
+                  })()}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center h-full">
+                <Layers className="w-8 h-8 text-muted-foreground/40 mb-2" />
+                <p className="text-xs text-muted-foreground italic">Select a lap to view checkpoint details</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Yield Breakdown for Animal Farming (kept as single section since it's already compact) */}
+      {session.jobCategory === 'animal' && (
+        <div className="bg-card border border-border/50 rounded-xl p-4 md:p-6 shadow-lg">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-1.5 border-b border-border/20 pb-2">
+            <PawPrint className="w-4 h-4 text-amber-400" />
+            {t("ana.yieldBreakdown")}
+          </h3>
+          
+          <div className="space-y-3">
+            {session.laps[0]?.checkpoints && session.laps[0].checkpoints.length > 0 ? (
               <div className="space-y-1.5">
                 {session.laps[0].checkpoints.map((cp: any, cpi: number) => (
                   <div key={cpi} className="flex justify-between items-center p-3 bg-background/50 rounded-lg border border-border/30 hover:border-amber-500/20 transition-colors">
@@ -280,118 +483,10 @@ export function SharedSessionDetail({ session, jobs, vehicleName, cityName }: Sh
               </div>
             ) : (
               <p className="text-center text-muted-foreground py-6 text-sm italic">ไม่มีข้อมูลผลลัพธ์วัตถุดิบ</p>
-            )
-          ) : (
-            session.laps.map((lap, i) => {
-              const cps = lap.checkpoints || [];
-              
-              // Group checkpoints into loops (for dimension mode)
-              const loops: JobCheckpoint[][] = [];
-              if (isDimensionSession && jobCount > 0 && cps.length > jobCount) {
-                for (let li = 0; li < cps.length; li += jobCount) {
-                  loops.push(cps.slice(li, li + jobCount));
-                }
-              }
-
-              return (
-                <div key={lap.id || i} className="p-4 bg-background/50 rounded-xl border border-border/30 hover:border-primary/20 transition-all duration-200">
-                  {/* Lap Header Summary */}
-                  <div className="flex justify-between items-center pb-2 border-b border-border/10 mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-primary">{t("dash.lap")} {lap.lapNumber}</span>
-                      <span className="text-xs text-muted-foreground">({lap.itemsGathered} {t("dash.sets")})</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="font-mono text-sm font-bold text-foreground">{formatTime(lap.durationMs)}</span>
-                      <span className="text-emerald-400 font-mono text-sm font-bold">${lap.ecoEarned.toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  {/* Checkpoints or Loops Breakdown */}
-                  {isDimensionSession && loops.length > 0 ? (
-                    <div className="space-y-3">
-                      {loops.map((loopCps, loopIdx) => {
-                        const loopTotalMs = loopCps.reduce((a, c) => a + c.durationMs, 0);
-                        return (
-                          <div key={loopIdx} className="rounded-lg border border-primary/10 bg-primary/[0.02] overflow-hidden shadow-sm">
-                            {/* Loop Header */}
-                            <div className="flex items-center justify-between px-3 py-2 bg-primary/[0.04] border-b border-primary/10">
-                              <div className="flex items-center gap-2">
-                                <Layers className="w-3.5 h-3.5 text-primary" />
-                                <span className="text-xs font-bold text-primary uppercase tracking-wider">
-                                  Loop {loopIdx + 1}
-                                </span>
-                              </div>
-                              <span className="text-xs font-mono font-bold text-muted-foreground">{formatTime(loopTotalMs)}</span>
-                            </div>
-                            {/* Per-Job in this Loop */}
-                            <div className="px-3 py-2 space-y-1.5">
-                              {loopCps.map((cp, ci) => {
-                                const jName = jobs.find(j => j.id === cp.jobId)?.name || cp.jobId;
-                                const pctOfLoop = loopTotalMs > 0 ? (cp.durationMs / loopTotalMs * 100) : 0;
-                                return (
-                                  <div key={ci} className="flex items-center justify-between text-xs group/cp">
-                                    <span className="text-muted-foreground group-hover/cp:text-foreground transition-colors font-medium">{jName}</span>
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-20 h-1 bg-border/20 rounded-full overflow-hidden hidden sm:block">
-                                        <div 
-                                          className="h-full bg-primary/60 rounded-full" 
-                                          style={{ width: `${Math.min(100, pctOfLoop)}%` }} 
-                                        />
-                                      </div>
-                                      <span className="font-mono text-muted-foreground font-semibold">{formatTime(cp.durationMs)}</span>
-                                      <span className="text-[10px] text-muted-foreground/60 w-8 text-right">{pctOfLoop.toFixed(0)}%</span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : cps.length > 1 ? (
-                    /* City Mode Checkpoint List */
-                    <div className="pl-3 border-l-2 border-primary/20 space-y-2 mt-2">
-                      {cps.map((cp, ci) => {
-                        const jName = jobs.find(j => j.id === cp.jobId)?.name || cp.jobId;
-                        const pctOfLap = lap.durationMs > 0 ? (cp.durationMs / lap.durationMs * 100) : 0;
-                        return (
-                          <div key={ci} className="flex items-center justify-between text-xs group/cp">
-                            <span className="text-muted-foreground group-hover/cp:text-foreground transition-colors font-medium">{jName}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-20 h-1 bg-border/20 rounded-full overflow-hidden hidden sm:block">
-                                <div 
-                                  className="h-full bg-primary/60 rounded-full" 
-                                  style={{ width: `${Math.min(100, pctOfLap)}%` }} 
-                                />
-                              </div>
-                              <span className="font-mono text-muted-foreground font-semibold">{formatTime(cp.durationMs)}</span>
-                              <span className="text-[10px] text-muted-foreground/60 w-8 text-right">{pctOfLap.toFixed(0)}%</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    cps.length === 1 && (
-                      <div className="text-xs text-muted-foreground pl-3 border-l-2 border-primary/20">
-                        {jobs.find(j => j.id === cps[0].jobId)?.name || cps[0].jobId}: <span className="font-mono font-bold text-foreground">{formatTime(cps[0].durationMs)}</span>
-                      </div>
-                    )
-                  )}
-                </div>
-              );
-            })
-          )}
-
-          {session.laps.length === 0 && (
-            <p className="text-center text-muted-foreground py-6 text-sm italic">
-              {t("ana.unknown")}
-            </p>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
