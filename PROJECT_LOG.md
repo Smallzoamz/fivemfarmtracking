@@ -95,4 +95,8 @@
 | 2026-05-20 23:36 | src/locales/en.ts, th.ts | 184-190 | i18n | Added | Added 5 missing translation keys: dash.pocketAllocation, dash.combinedIncome, dash.roundsToGoal, dash.incomeRange, ana.noYieldData. |
 | 2026-05-20 23:37 | src/components/ui/table.tsx, dialog.tsx | All | Cleanup | Deleted | Removed unused Shadcn UI components (never imported anywhere). |
 | 2026-05-20 23:38 | package.json | 20, 32 | Cleanup | Modified | Moved `shadcn` CLI tool from dependencies to devDependencies. |
+| 2026-05-23 23:08 | supabase/migrations/20260523223000_add_pocket_mode_columns.sql | All | Schema | Added | SQL migration to add `pocket_mode` (TEXT, default 'limit') and `pocket_kilo_limit` (NUMERIC, default 30) columns to `farm_presets` table for cloud sync of pocket capacity toggle. |
+| 2026-05-23 23:08 | src/store/farmStore.ts | 5-21, 139, 149-167, 182-189, 533-545, 656-673 | Model/Sync | Modified | Extended `Preset` interface with `pocketMode` and `pocketKiloLimit`. Updated default state, `addPreset` (with Supabase insert), `updatePreset` (with Supabase mapping), `loadFromCloud` (with cloud retrieval), and `onRehydrateStorage` (with auto-migration for legacy presets). |
+| 2026-05-23 23:08 | src/components/Dashboard.tsx | 139-147, 612-666 | Logic/UI | Modified | Updated `pocketSets` calculation to dynamically switch between Limit (`jobItemLimit`) and Kilo (`Math.floor(pocketKiloLimit / totalWeightPerSet)`) modes. Replaced flat job limit input with premium dual-mode toggle UI: Limit System / Kilo System buttons with conditional input fields. |
+| 2026-05-23 23:08 | src/locales/en.ts, th.ts | 32-36 | i18n | Added | Added 4 translation keys: dash.pocketMode, dash.limitMode, dash.kiloMode, dash.pocketKiloLimit in both English and Thai. |
 

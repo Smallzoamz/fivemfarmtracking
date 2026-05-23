@@ -7,6 +7,8 @@ export interface Preset {
   name: string;
   targetGoal: number;
   jobItemLimit: number;
+  pocketMode?: 'limit' | 'kilo';
+  pocketKiloLimit?: number;
   selectedJobIds?: string[];
   calcVehicleId?: string;
   isCraftingRoute?: boolean;
@@ -136,7 +138,7 @@ export const useFarmStore = create<FarmState>()(
       setUserId: (id) => set({ userId: id }),
       isCloudSyncing: false,
       
-      presets: [{ id: 'default', name: 'Default City', targetGoal: 1000000, jobItemLimit: 60 }],
+      presets: [{ id: 'default', name: 'Default City', targetGoal: 1000000, jobItemLimit: 60, pocketMode: 'limit', pocketKiloLimit: 30 }],
       activePresetId: 'default',
       jobs: [],
       vehicles: [],
@@ -146,7 +148,7 @@ export const useFarmStore = create<FarmState>()(
       addPreset: async (name) => {
         const newId = crypto.randomUUID();
         const { userId } = get();
-        const newPreset: Preset = { id: newId, name, targetGoal: 1000000, jobItemLimit: 60 };
+        const newPreset: Preset = { id: newId, name, targetGoal: 1000000, jobItemLimit: 60, pocketMode: 'limit', pocketKiloLimit: 30 };
         
         // Optimistic UI
         set((state) => ({
@@ -162,6 +164,8 @@ export const useFarmStore = create<FarmState>()(
               name: newPreset.name,
               target_goal: newPreset.targetGoal,
               job_item_limit: newPreset.jobItemLimit,
+              pocket_mode: newPreset.pocketMode,
+              pocket_kilo_limit: newPreset.pocketKiloLimit,
             });
           } catch (e) {
             console.error("Failed to insert preset", e);
@@ -180,6 +184,8 @@ export const useFarmStore = create<FarmState>()(
           if (data.name !== undefined) mappedData.name = data.name;
           if (data.targetGoal !== undefined) mappedData.target_goal = data.targetGoal;
           if (data.jobItemLimit !== undefined) mappedData.job_item_limit = data.jobItemLimit;
+          if (data.pocketMode !== undefined) mappedData.pocket_mode = data.pocketMode;
+          if (data.pocketKiloLimit !== undefined) mappedData.pocket_kilo_limit = data.pocketKiloLimit;
           if (data.isVipMode !== undefined) mappedData.is_vip_mode = data.isVipMode;
           if (data.isProcessBeforeStore !== undefined) mappedData.is_process_before_store = data.isProcessBeforeStore;
           if (data.farmMode !== undefined) mappedData.farm_mode = data.farmMode;
@@ -535,6 +541,8 @@ export const useFarmStore = create<FarmState>()(
               name: p.name,
               targetGoal: p.target_goal,
               jobItemLimit: p.job_item_limit,
+              pocketMode: p.pocket_mode || 'limit',
+              pocketKiloLimit: p.pocket_kilo_limit || 30,
               isVipMode: p.is_vip_mode,
               isProcessBeforeStore: p.is_process_before_store,
               farmMode: p.farm_mode,
@@ -658,9 +666,18 @@ export const useFarmStore = create<FarmState>()(
               id: 'default',
               name: 'Default City',
               targetGoal: 1000000,
-              jobItemLimit: 60
+              jobItemLimit: 60,
+              pocketMode: 'limit',
+              pocketKiloLimit: 30
             }];
             state.activePresetId = 'default';
+          } else {
+            // Fill in missing properties for existing presets
+            state.presets = state.presets.map(p => ({
+              ...p,
+              pocketMode: p.pocketMode || 'limit',
+              pocketKiloLimit: p.pocketKiloLimit || 30
+            }));
           }
         }
       }

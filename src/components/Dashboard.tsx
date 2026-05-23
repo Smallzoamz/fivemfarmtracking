@@ -138,7 +138,12 @@ export function Dashboard() {
       pocketSets = dimensionPocketLoops * dimensionYieldPerLoop;
     } else if (totalWeightPerSet > 0) {
       trunkSets = selectedVehicle ? Math.floor(selectedVehicle.trunkCapacity / totalWeightPerSet) : 0;
-      pocketSets = activePreset.jobItemLimit || 60;
+      const pMode = activePreset.pocketMode || 'limit';
+      if (pMode === 'kilo') {
+        pocketSets = totalWeightPerSet > 0 ? Math.floor((activePreset.pocketKiloLimit || 30) / totalWeightPerSet) : 0;
+      } else {
+        pocketSets = activePreset.jobItemLimit || 60;
+      }
       totalSets = trunkSets + pocketSets;
 
       if (isCraftingRoute) {
@@ -605,13 +610,58 @@ export function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5 p-3 bg-background/50 rounded-lg border border-border/40">
-              <Label className="text-xs text-primary font-bold uppercase tracking-wider">{t("dash.targetGoal")}</Label>
-              <Input type="number" value={activePreset.targetGoal} onChange={(e) => updatePreset(activePresetId, { targetGoal: Number(e.target.value) })} className="h-9 text-sm" />
+            <div className="space-y-1.5 p-3 bg-background/50 rounded-lg border border-border/40 flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-primary font-bold uppercase tracking-wider">{t("dash.targetGoal")}</Label>
+                <Input type="number" value={activePreset.targetGoal} onChange={(e) => updatePreset(activePresetId, { targetGoal: Number(e.target.value) })} className="h-9 text-sm" />
+              </div>
             </div>
-            <div className="space-y-1.5 p-3 bg-background/50 rounded-lg border border-border/40">
-              <Label className="text-xs text-primary font-bold uppercase tracking-wider">{t("dash.jobLimit")}</Label>
-              <Input type="number" value={activePreset.jobItemLimit} onChange={(e) => updatePreset(activePresetId, { jobItemLimit: Number(e.target.value) })} className="h-9 text-sm" />
+            <div className="p-3 bg-background/50 border border-border/40 rounded-lg space-y-2.5 flex flex-col justify-between">
+              <div className="flex flex-col space-y-1.5">
+                <Label className="text-xs text-primary font-bold uppercase tracking-wider">{t("dash.pocketMode")}</Label>
+                <div className="flex gap-1.5">
+                  <Button 
+                    variant={(activePreset.pocketMode || 'limit') === 'limit' ? "default" : "outline"} 
+                    size="sm"
+                    onClick={() => updatePreset(activePresetId, { pocketMode: 'limit' })}
+                    className={`text-xs h-7 px-3 ${(activePreset.pocketMode || 'limit') === 'limit' ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "opacity-60 hover:opacity-100"}`}
+                  >
+                    {t("dash.limitMode")}
+                  </Button>
+                  <Button 
+                    variant={(activePreset.pocketMode || 'limit') === 'kilo' ? "default" : "outline"} 
+                    size="sm"
+                    onClick={() => updatePreset(activePresetId, { pocketMode: 'kilo' })}
+                    className={`text-xs h-7 px-3 ${(activePreset.pocketMode || 'limit') === 'kilo' ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" : "opacity-60 hover:opacity-100"}`}
+                  >
+                    {t("dash.kiloMode")}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-1">
+                {(activePreset.pocketMode || 'limit') === 'kilo' ? (
+                  <>
+                    <Label className="text-[10px] text-muted-foreground font-semibold">{t("dash.pocketKiloLimit")}</Label>
+                    <Input 
+                      type="number" 
+                      value={activePreset.pocketKiloLimit || 30} 
+                      onChange={(e) => updatePreset(activePresetId, { pocketKiloLimit: Number(e.target.value) })} 
+                      className="h-8 text-xs" 
+                    />
+                  </>
+                ) : (
+                  <>
+                    <Label className="text-[10px] text-muted-foreground font-semibold">{t("dash.jobLimit")}</Label>
+                    <Input 
+                      type="number" 
+                      value={activePreset.jobItemLimit} 
+                      onChange={(e) => updatePreset(activePresetId, { jobItemLimit: Number(e.target.value) })} 
+                      className="h-8 text-xs" 
+                    />
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
